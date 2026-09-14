@@ -6,21 +6,23 @@ import { useSavedStocks } from './hooks/useSavedStocks.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
 import { useWatchlist } from './hooks/useWatchlist.ts';
 import { BUILT_IN_STOCKS } from './lib/data/loadHistory.ts';
-import { loadManifest, loadStockList } from './lib/data/loadStatic.ts';
+import { loadManifest, loadResearchScores, loadStockList } from './lib/data/loadStatic.ts';
 import { toListedStocks } from './lib/data/stockList.ts';
 import { NSE_INDICES } from './lib/data/symbols.ts';
 import type { Tab } from './lib/urlState.ts';
 import { AnalyzeTab } from './tabs/AnalyzeTab.tsx';
 import { DashboardTab } from './tabs/DashboardTab.tsx';
 import { FetchTab } from './tabs/FetchTab.tsx';
+import { ReportTab } from './tabs/ReportTab.tsx';
 import { TrackerTab } from './tabs/TrackerTab.tsx';
 import { WatchlistTab } from './tabs/WatchlistTab.tsx';
 
 const PAGES: Record<Tab, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Dashboard', subtitle: "Today's sheet: every stock's latest close and where the model puts it in a month." },
-  analyze: { title: 'Analyze', subtitle: 'Forecast, backtest and technical indicators for any NSE stock.' },
+  dashboard: { title: 'Dashboard', subtitle: "Today's sheet: every stock's latest close, where the model puts it in a month, and its research rank." },
+  analyze: { title: 'Analyze', subtitle: 'Forecast, backtest, track record and technical indicators for any NSE stock.' },
   watchlist: { title: 'Watchlist', subtitle: 'Your starred stocks at a glance.' },
-  tracker: { title: 'Tracker', subtitle: 'Saved daily predictions compared with what actually happened.' },
+  tracker: { title: 'Tracker', subtitle: 'Saved daily predictions and monthly paper portfolios, compared with what actually happened.' },
+  report: { title: 'Model report', subtitle: 'How the forecasts and stock rankings have actually performed, tested month by month.' },
   fetch: { title: 'Fetch any stock', subtitle: 'Add NSE stocks to your Dashboard, and choose which ones to track daily.' },
 };
 
@@ -32,6 +34,8 @@ export default function App() {
   const saved = useSavedStocks();
   const manifest = useAsync((signal) => loadManifest(signal), []);
   const stockList = useAsync((signal) => loadStockList(signal), []);
+  const research = useAsync((signal) => loadResearchScores(signal), []);
+  const scores = research.status === 'ready' ? research.data : null;
 
   // Stock search: your own stocks first (built-in, tracked, fetched), then indices, then every NSE stock.
   const options = useMemo(() => {
@@ -44,7 +48,7 @@ export default function App() {
     };
     BUILT_IN_STOCKS.forEach((s) => add({ ...s, badge: 'Built-in' }));
     if (manifest.status === 'ready') {
-      manifest.data?.symbols.filter((e) => e.source === 'tracked').forEach((e) => add({ symbol: e.symbol, name: e.name, badge: 'Tracked' }));
+      manifest.data?.symbols.forEach((e) => add({ symbol: e.symbol, name: e.name, badge: e.source === 'tracked' ? 'Tracked' : 'Built-in' }));
     }
     saved.stocks.forEach((s) => add({ ...s, badge: 'Fetched' }));
     NSE_INDICES.forEach((s) => add({ symbol: s.symbol, name: 'NSE index', badge: 'Index' }));
@@ -68,11 +72,12 @@ export default function App() {
         </div>
 
         {tab === 'dashboard' && (
-          <DashboardTab manifest={manifest} fetched={saved.stocks} watchlist={watchlist} onOpen={analyzeStock} />
+          <DashboardTab manifest={manifest} scores={scores} fetched={saved.stocks} watchlist={watchlist} onOpen={analyzeStock} />
         )}
-        {tab === 'analyze' && <AnalyzeTab symbol={symbol} options={options} watchlist={watchlist} onSelect={analyzeStock} />}
+        {tab === 'analyze' && <AnalyzeTab symbol={symbol} options={options} watchlist={watchlist} scores={scores} onSelect={analyzeStock} />}
         {tab === 'watchlist' && <WatchlistTab symbols={watchlist.symbols} onOpen={analyzeStock} onRemove={watchlist.toggle} />}
         {tab === 'tracker' && <TrackerTab symbol={symbol} onSelectSymbol={(next) => navigate({ symbol: next })} onAnalyze={analyzeStock} />}
+        {tab === 'report' && <ReportTab />}
         {tab === 'fetch' && <FetchTab options={options} saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
       </main>
     </div>

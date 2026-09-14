@@ -13,6 +13,7 @@
     "fetch-data": "node scripts/fetch-data.ts",
     "save-snapshot": "node scripts/save-snapshot.ts",
     "build-tracker": "node scripts/build-tracker.ts",
+    "research": "node scripts/research.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -3,7 +3,7 @@ import { Card } from '../components/Card.tsx';
 import { StockPicker } from '../components/StockPicker.tsx';
 import { TrackerChart, type Point } from '../components/TrackerChart.tsx';
 import { useAsync } from '../hooks/useAsync.ts';
-import { loadTrackerIndex, loadTrackerSheet, loadTrackerStock } from '../lib/data/loadStatic.ts';
+import { loadPortfolios, loadTrackerIndex, loadTrackerSheet, loadTrackerStock } from '../lib/data/loadStatic.ts';
 import { displaySymbol } from '../lib/data/symbols.ts';
 import { formatDate, nextTradingDays } from '../lib/dates.ts';
 import { formatPct, formatPrice } from '../lib/format.ts';
@@ -18,7 +18,7 @@ const directionRight = (close: number, predicted: number, actual: number) =>
 
 export function TrackerTab({ symbol, onSelectSymbol, onAnalyze }: Props) {
   const index = useAsync((signal) => loadTrackerIndex(signal), []);
-  const [view, setView] = useState<'stock' | 'day'>('stock');
+  const [view, setView] = useState<'stock' | 'day' | 'portfolio'>('stock');
 
   if (index.status === 'loading') return <div className="h-64 animate-pulse rounded-xl bg-ink-900" />;
   if (index.status === 'error') return <p className="text-sm text-rose-300">{index.message}</p>;
@@ -32,7 +32,7 @@ export function TrackerTab({ symbol, onSelectSymbol, onAnalyze }: Props) {
       <ScoreCards score={data.score} dates={data.dates} />
 
       <div className="flex w-fit rounded-lg border border-ink-700 p-0.5" role="group" aria-label="Tracker view">
-        {(['stock', 'day'] as const).map((v) => (
+        {(['stock', 'day', 'portfolio'] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -40,12 +40,14 @@ export function TrackerTab({ symbol, onSelectSymbol, onAnalyze }: Props) {
             aria-pressed={view === v}
             className={`rounded-md px-3 py-1 text-sm ${view === v ? 'bg-ink-700 text-white' : 'text-ink-400 hover:text-ink-200'}`}
           >
-            {v === 'stock' ? 'By stock' : 'By day'}
+            {v === 'stock' ? 'By stock' : v === 'day' ? 'By day' : 'Paper portfolio'}
           </button>
         ))}
       </div>
 
-      {view === 'stock' ? (
+      {view === 'portfolio' ? (
+        <PortfolioView onOpenStock={onAnalyze} />
+      ) : view === 'stock' ? (
         <StockView index={data} symbol={selected} onSelectSymbol={onSelectSymbol} onAnalyze={onAnalyze} />
       ) : (
         <DayView
@@ -299,6 +301,126 @@ function SheetSummary({ score, total }: { score: Score; total: number }) {
       {score.matured} of {total} checked · average error {formatPct(score.avgError!)} · direction right {score.directionHits}/{score.matured} · inside
       range {score.insideRange}/{score.matured}
     </p>
+  );
+}
+
+const monthName = (month: string) =>
+  new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const signedPct = (value: number | null) => (value == null ? '—' : formatPct(value, true));
+const signTone = (value: number | null) => (value == null ? '' : value >= 0 ? 'text-emerald-400' : 'text-rose-400');
+
+function PortfolioView({ onOpenStock }: { onOpenStock: (symbol: string) => void }) {
+  const report = useAsync((signal) => loadPortfolios(signal), []);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  if (report.status === 'loading') return <div className="h-64 animate-pulse rounded-xl bg-ink-900" />;
+  if (report.status === 'error') return <p className="text-sm text-rose-300">{report.message}</p>;
+  if (!report.data || report.data.portfolios.length === 0) {
+    return (
+      <Card title="No paper portfolio yet" subtitle="It starts with the next monthly update.">
+        <p className="text-sm text-ink-300">
+          On the first evening update of each month, the top 20% of the Dashboard's Rank (the Model report's best-tested ranking signal) is saved
+          here as a paper portfolio, then compared with the average NIFTY 200 stock and NIFTY 50 as the month plays out.
+        </p>
+      </Card>
+    );
+  }
+
+  const { portfolios, total } = report.data;
+  const chosen = portfolios.find((p) => p.month === picked) ?? portfolios[portfolios.length - 1];
+  const stats = [
+    { label: 'Months', value: String(total.months), className: '' },
+    { label: 'Paper portfolio', value: signedPct(total.portfolio), className: signTone(total.portfolio) },
+    { label: 'Average stock', value: signedPct(total.universe), className: signTone(total.universe) },
+    { label: 'NIFTY 50', value: signedPct(total.nifty), className: signTone(total.nifty) },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="rounded-xl border border-ink-800 bg-ink-900/60 p-4">
+            <p className="text-xs text-ink-400">{s.label}</p>
+            <p className={`mt-1 text-lg font-semibold tabular-nums ${s.className}`}>{s.value}</p>
+            <p className="mt-0.5 text-[11px] text-ink-500">Total, all months</p>
+          </div>
+        ))}
+      </div>
+
+      <Card title="Monthly paper portfolios" subtitle="Equal-weight price returns, before costs and dividends. The newest portfolio is still running. Click a month for its holdings.">
+        <div className="scroll-area max-h-96">
+          <table className="w-full min-w-[620px] text-sm">
+            <thead className="sticky top-0 bg-ink-900">
+              <tr className="text-xs whitespace-nowrap text-ink-400">
+                <th className="py-2 pr-3 text-left font-medium">Month</th>
+                <th className="py-2 pr-3 text-right font-medium">Stocks</th>
+                <th className="py-2 pr-3 text-right font-medium">Portfolio</th>
+                <th className="py-2 pr-3 text-right font-medium">Average stock</th>
+                <th className="py-2 pr-3 text-right font-medium">NIFTY 50</th>
+                <th className="py-2 text-right font-medium">vs average</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...portfolios].reverse().map((p) => {
+                const cell = 'py-2 pr-3 text-right tabular-nums';
+                const versus = p.return != null && p.universeReturn != null ? p.return - p.universeReturn : null;
+                return (
+                  <tr
+                    key={p.month}
+                    onClick={() => setPicked(p.month)}
+                    aria-selected={p.month === chosen.month}
+                    className={`cursor-pointer border-t border-ink-800 ${p.month === chosen.month ? 'bg-accent-500/10' : 'hover:bg-ink-800/40'}`}
+                  >
+                    <td className="py-2 pr-3">
+                      {monthName(p.month)}
+                      <span className="block text-[11px] text-ink-500">
+                        {formatDate(p.date)} to {formatDate(p.endDate)}
+                        {p.open && ' · running'}
+                      </span>
+                    </td>
+                    <td className={`${cell} text-ink-400`}>{p.holdings.length}</td>
+                    <td className={`${cell} font-semibold ${signTone(p.return)}`}>{signedPct(p.return)}</td>
+                    <td className={`${cell} ${signTone(p.universeReturn)}`}>{signedPct(p.universeReturn)}</td>
+                    <td className={`${cell} ${signTone(p.niftyReturn)}`}>{signedPct(p.niftyReturn)}</td>
+                    <td className={`py-2 text-right tabular-nums ${signTone(versus)}`}>{signedPct(versus)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card title={`Holdings: ${monthName(chosen.month)}`} subtitle={`Bought at the close on ${formatDate(chosen.date)}. Click a stock to analyze it.`}>
+        <div className="scroll-area max-h-96">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead className="sticky top-0 bg-ink-900">
+              <tr className="text-xs text-ink-400">
+                <th className="py-2 pr-3 text-left font-medium">Stock</th>
+                <th className="py-2 pr-3 text-right font-medium">Start</th>
+                <th className="py-2 pr-3 text-right font-medium">{chosen.open ? 'Latest' : 'End'}</th>
+                <th className="py-2 text-right font-medium">Return</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...chosen.holdings]
+                .sort((x, y) => (y.return ?? -Infinity) - (x.return ?? -Infinity))
+                .map((h) => (
+                  <tr key={h.symbol} onClick={() => onOpenStock(h.symbol)} className="cursor-pointer border-t border-ink-800 hover:bg-ink-800/40">
+                    <td className="py-2 pr-3">
+                      <span className="block font-medium">{displaySymbol(h.symbol)}</span>
+                      <span className="block max-w-56 truncate text-xs text-ink-400">{h.name}</span>
+                    </td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{h.entry == null ? '—' : formatPrice(h.entry, h.symbol)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{h.exit == null ? '—' : formatPrice(h.exit, h.symbol)}</td>
+                    <td className={`py-2 text-right tabular-nums ${signTone(h.return)}`}>{signedPct(h.return)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
   );
 }
 

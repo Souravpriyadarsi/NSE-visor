@@ -1,5 +1,5 @@
-// Downloads daily history into public/data/ for every built-in stock (symbols.json) and every
-// stock added to daily tracking, and writes index.json with each stock's latest forecast.
+// Downloads daily history into public/data/ for every built-in stock (the NIFTY 200, plus symbols.json and India VIX)
+// and every stock added to daily tracking, and writes index.json with each stock's latest forecast.
 // Usage: npm run fetch-data            (all stocks)
 //        npm run fetch-data -- TCS INFY (only these)
 // Optional env: YAHOO_PROXY_URL (the Worker, for its /tracked list), PAGES_URL (fallback to deployed data).
@@ -9,6 +9,7 @@ import { fileId, isValidSymbol, normalizeSymbol } from '../src/lib/data/symbols.
 import { parseChart } from '../src/lib/data/yahoo.ts';
 import type { HistoryFile, Manifest, ManifestEntry, SymbolInfo } from '../src/types.ts';
 import { NSE_EQUITY_LIST_URL, parseEquityList, type StockListFile } from '../src/lib/data/stockList.ts';
+import { NIFTY_200_URL, parseIndexList, type UniverseFile } from '../src/lib/data/indexList.ts';
 import { fetchChart, sleep, USER_AGENT } from './yahoo-fetch.ts';
 
 type Target = SymbolInfo & { source: ManifestEntry['source'] };
@@ -16,6 +17,8 @@ type Target = SymbolInfo & { source: ManifestEntry['source'] };
 const OUT_DIR = new URL('../public/data/', import.meta.url);
 const DELAY_MS = 1500;
 const MAX_MISSING_RATIO = 0.2;
+/** Downloaded for the market-regime check only, so not listed on the Dashboard. */
+const REGIME_ONLY = new Set(['^INDIAVIX']);
 const pagesUrl = process.env.PAGES_URL?.replace(/\/$/, '');
 
 async function getJson<T>(url: string): Promise<T | null> {
@@ -69,6 +72,29 @@ async function saveStockList(): Promise<void> {
   console.log(`NSE stock list: ${file.stocks.length} stocks\n`);
 }
 
+/** NIFTY 200 members, the research universe. Keeps the deployed list if NSE's download fails. */
+async function loadUniverse(): Promise<UniverseFile | null> {
+  let file: UniverseFile | null = null;
+  try {
+    const res = await fetch(NIFTY_200_URL, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'text/csv' },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const stocks = parseIndexList(await res.text());
+    if (stocks.length < 150) throw new Error(`only ${stocks.length} stocks in the file`);
+    file = { updatedAt: new Date().toISOString(), index: 'NIFTY 200', stocks };
+  } catch (err) {
+    console.warn(`Could not download the NIFTY 200 list: ${err instanceof Error ? err.message : String(err)}`);
+    file = pagesUrl ? await getJson<UniverseFile>(`${pagesUrl}/data/universe.json`) : null;
+    if (file) console.warn('      using the previously deployed list');
+  }
+  if (!file) return null;
+  await writeFile(new URL('universe.json', OUT_DIR), JSON.stringify(file));
+  console.log(`NIFTY 200 list: ${file.stocks.length} stocks\n`);
+  return file;
+}
+
 function toEntry(history: HistoryFile, source: Target['source'], file: string): ManifestEntry {
   const summary = summarize(history);
   return {
@@ -85,9 +111,19 @@ function toEntry(history: HistoryFile, source: Target['source'], file: string): 
   };
 }
 
-const builtIn = (JSON.parse(await readFile(new URL('../symbols.json', import.meta.url), 'utf8')) as SymbolInfo[]).map(
-  (s): Target => ({ ...s, source: 'built-in' }),
-);
+await mkdir(OUT_DIR, { recursive: true });
+await saveStockList();
+const universe = await loadUniverse();
+
+// symbols.json first, so its shorter company names win over NSE's.
+const builtIn: Target[] = [];
+for (const stock of [
+  ...(JSON.parse(await readFile(new URL('../symbols.json', import.meta.url), 'utf8')) as SymbolInfo[]),
+  ...(universe?.stocks ?? []),
+  { symbol: '^INDIAVIX', name: 'India VIX' },
+]) {
+  if (!builtIn.some((b) => b.symbol === stock.symbol)) builtIn.push({ symbol: stock.symbol, name: stock.name, source: 'built-in' });
+}
 const tracked = (await trackedStocks())
   .filter((s) => !builtIn.some((b) => b.symbol === s.symbol))
   .map((s): Target => ({ ...s, source: 'tracked' }));
@@ -98,8 +134,6 @@ const targets: Target[] = requested.length
   ? requested.map((symbol) => everything.find((s) => s.symbol === symbol) ?? { symbol, name: symbol, source: 'tracked' })
   : everything;
 
-await mkdir(OUT_DIR, { recursive: true });
-await saveStockList();
 const entries: ManifestEntry[] = [];
 const failed: string[] = [];
 let missing = 0;
@@ -122,7 +156,7 @@ for (const [index, target] of targets.entries()) {
   }
   const file = `${fileId(target.symbol)}.json`;
   await writeFile(new URL(file, OUT_DIR), JSON.stringify(history));
-  entries.push(toEntry(history, target.source, file));
+  if (!REGIME_ONLY.has(target.symbol)) entries.push(toEntry(history, target.source, file));
 }
 
 // When refreshing only some symbols, keep the other entries already in the index.

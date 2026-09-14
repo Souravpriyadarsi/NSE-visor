@@ -1,6 +1,6 @@
 import type { Forecast, ModelName } from '../../types.ts';
 import { nextTradingDays } from '../dates.ts';
-import { gbm, type GbmResult } from './gbm.ts';
+import { gbm, type GbmOptions, type GbmResult, type VolatilityMethod } from './gbm.ts';
 import { holt } from './holt.ts';
 import { linearTrend } from './linearTrend.ts';
 
@@ -10,10 +10,15 @@ export const MIN_FORECAST_BARS = 60;
 export const MODEL_NAMES: ModelName[] = ['trend', 'holt', 'gbm'];
 const MIN_WEIGHT = 0.15;
 
+/** How the likely range is simulated; compared in the research backtest (scripts/research.ts). */
+export const RANGE_METHOD: VolatilityMethod = 'adaptive';
+/** Widens (above 1) or narrows the range so about 80% of actual prices land inside it, as measured by the research backtest. */
+export const RANGE_SCALE = 1;
+
 export type ModelRun = { perModel: Record<ModelName, number[]>; simulation: GbmResult };
 
-export function runModels(prices: number[], seed: number): ModelRun {
-  const simulation = gbm(prices, HORIZON, seed);
+export function runModels(prices: number[], seed: number, options: GbmOptions = {}): ModelRun {
+  const simulation = gbm(prices, HORIZON, seed, { method: RANGE_METHOD, ...options });
   return {
     perModel: { trend: linearTrend(prices, HORIZON), holt: holt(prices, HORIZON), gbm: simulation.mid },
     simulation,
@@ -29,8 +34,12 @@ export function weightsFromErrors(errors: Record<ModelName, number> | null): Rec
   return Object.fromEntries(MODEL_NAMES.map((m, i) => [m, MIN_WEIGHT + (spare * inverse[i]) / total])) as Record<ModelName, number>;
 }
 
-/** Weighted average of the models (in log space), with the range taken from the simulation's spread. */
-export function blend(run: ModelRun, weights: Record<ModelName, number>): { mid: number[]; low: number[]; high: number[] } {
+/** Weighted average of the models (in log space), with the range taken from the simulation's spread, scaled by rangeScale. */
+export function blend(
+  run: ModelRun,
+  weights: Record<ModelName, number>,
+  rangeScale = RANGE_SCALE,
+): { mid: number[]; low: number[]; high: number[] } {
   const mid: number[] = [];
   const low: number[] = [];
   const high: number[] = [];
@@ -40,8 +49,8 @@ export function blend(run: ModelRun, weights: Record<ModelName, number>): { mid:
     for (const m of MODEL_NAMES) logMid += weights[m] * Math.log(run.perModel[m][k]);
     const value = Math.exp(logMid);
     mid.push(value);
-    low.push((value * simulation.low[k]) / simulation.mid[k]);
-    high.push((value * simulation.high[k]) / simulation.mid[k]);
+    low.push(value * (simulation.low[k] / simulation.mid[k]) ** rangeScale);
+    high.push(value * (simulation.high[k] / simulation.mid[k]) ** rangeScale);
   }
   return { mid, low, high };
 }

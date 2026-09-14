@@ -41,6 +41,12 @@ jobs:
           # Cloudflare Worker URL (optional repository variable): adds stocks tracked from the app.
           YAHOO_PROXY_URL: ${{ vars.YAHOO_PROXY_URL }}
 
+      # Replays ~8 years of monthly forecasts and stock rankings for the Model Report page.
+      # If it fails, the site still deploys without the report.
+      - name: Research backtest
+        run: npm run research
+        continue-on-error: true
+
       - name: Load saved prediction sheets
         env:
           GH_TOKEN: ${{ github.token }}

@@ -3,6 +3,7 @@ import { BacktestPanel } from '../components/BacktestPanel.tsx';
 import { ForecastCards } from '../components/ForecastCards.tsx';
 import { IndicatorsPanel } from '../components/IndicatorsPanel.tsx';
 import { PriceChart } from '../components/PriceChart.tsx';
+import { ResearchPanel } from '../components/ResearchPanel.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
 import { useHistory } from '../hooks/useHistory.ts';
 import type { Watchlist } from '../hooks/useWatchlist.ts';
@@ -11,16 +12,18 @@ import { displaySymbol } from '../lib/data/symbols.ts';
 import { formatDate } from '../lib/dates.ts';
 import { formatPct, formatPrice } from '../lib/format.ts';
 import { MIN_FORECAST_BARS } from '../lib/models/ensemble.ts';
+import type { ResearchScores } from '../lib/research/research.ts';
 import type { HistoryFile } from '../types.ts';
 
 type Props = {
   symbol: string;
   options: PickerOption[];
   watchlist: Watchlist;
+  scores: ResearchScores | null;
   onSelect: (symbol: string) => void;
 };
 
-export function AnalyzeTab({ symbol, options, watchlist, onSelect }: Props) {
+export function AnalyzeTab({ symbol, options, watchlist, scores, onSelect }: Props) {
   const { state, retry } = useHistory(symbol);
   const analysis = useMemo(() => (state.status === 'ready' ? analyze(state.history) : null), [state]);
   const history = state.status === 'ready' ? state.history : null;
@@ -71,6 +74,7 @@ export function AnalyzeTab({ symbol, options, watchlist, onSelect }: Props) {
             )}
             <BacktestPanel backtest={analysis.backtest} />
           </div>
+          <ResearchPanel symbol={history.symbol} scores={scores} />
           <IndicatorsPanel analysis={analysis} symbol={history.symbol} />
           <p className="text-xs text-ink-500">
             Prices updated{' '}

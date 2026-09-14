@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mulberry32, normal } from '../random.ts';
 import { backtest, MIN_BACKTEST_BARS } from './backtest.ts';
 import { forecast, HORIZON, weightsFromErrors } from './ensemble.ts';
-import { gbm } from './gbm.ts';
+import { estimateVolatility, gbm } from './gbm.ts';
 import { holt } from './holt.ts';
 import { linearTrend } from './linearTrend.ts';
 
@@ -51,6 +51,25 @@ describe('gbm', () => {
     const a = gbm(prices, HORIZON, 99);
     expect(gbm(prices, HORIZON, 99)).toEqual(a);
     expect(gbm(prices, HORIZON, 100).mid).not.toEqual(a.mid);
+    expect(a.high[HORIZON - 1] - a.low[HORIZON - 1]).toBeGreaterThan(a.high[0] - a.low[0]);
+  });
+});
+
+describe('estimateVolatility', () => {
+  it('reacts to recent turbulence faster than the 1-year estimate', () => {
+    const random = mulberry32(7);
+    const returns = Array.from({ length: 600 }, (_, t) => (t < 560 ? 0.01 : 0.04) * normal(random));
+    const classic = estimateVolatility(returns, 'classic');
+    const adaptive = estimateVolatility(returns, 'adaptive');
+    expect(classic.shocks).toBeNull();
+    expect(adaptive.volatility).toBeGreaterThan(classic.volatility);
+    expect(adaptive.shocks).toHaveLength(504);
+  });
+
+  it('keeps reproducible, widening ranges with resampled moves', () => {
+    const prices = noisy(600, 4);
+    const a = gbm(prices, HORIZON, 5, { method: 'adaptive', paths: 500 });
+    expect(gbm(prices, HORIZON, 5, { method: 'adaptive', paths: 500 })).toEqual(a);
     expect(a.high[HORIZON - 1] - a.low[HORIZON - 1]).toBeGreaterThan(a.high[0] - a.low[0]);
   });
 });
