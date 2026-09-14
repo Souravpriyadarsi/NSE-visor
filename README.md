@@ -7,6 +7,7 @@ A lightweight web app for NSE (India) stocks, with five pages in the sidebar:
 - **Watchlist**: your starred stocks at a glance. Click one to open it in Analyze.
 - **Tracker**: every weekday evening the day's forecasts are saved. The Tracker shows each saved prediction next to the actual price once its month has passed, as a chart and as tables by stock or by day. Predictions still inside their month show as pending.
 - **Model report**: an honest, month-by-month backtest over the NIFTY 200 with the last 2 years sealed as a final test: how accurate the forecasts and ranges have been against simple baselines, and which stock-ranking signals (momentum, low volatility and others) have beaten the average stock after trading costs.
+- **Tests**: trading-rule experiments on real prices with typical Indian brokerage charges. The first is the **same-day trading test**: for any stock, ₹5,000 or ₹10,000 traded every day either overnight (buy at the close, sell at the next open) or intraday (buy at the open, sell at the close), charted against simply holding the stock, plus an all-stocks table.
 - **Fetch any stock**: search all ~2,500 NSE stocks by company name or ticker, add them to your Dashboard, and choose which ones to **track daily**. The Analyze search covers every NSE stock too.
 
 Built with TypeScript, React, Tailwind CSS v4, Vite and [lightweight-charts](https://github.com/tradingview/lightweight-charts). All the maths is plain TypeScript with no ML libraries.
@@ -29,6 +30,7 @@ Open the URL Vite prints. `fetch-data` builds the Dashboard's data; Analyze and 
 | `npm run fetch-data` | Download NSE's full stock list, plus every built-in and tracked stock with forecasts, to `public/data/` |
 | `npm run fetch-data -- TCS INFY` | Download only some stocks |
 | `npm run research` | Replay ~8 years of monthly forecasts and rankings into `public/research/` (after `fetch-data`, takes a few minutes) |
+| `npm run same-day-test` | Build the Tests page's all-stocks table into `public/research/same-day.json` (after `fetch-data`) |
 | `npm run save-snapshot` | Save today's forecasts to `snapshots/<date>.json` |
 | `npm run build-tracker` | Compare saved snapshots with actual prices into `public/tracker/` |
 | `npm run build` | Build the static site into `dist/` |
@@ -78,13 +80,14 @@ Fetched stocks and their prices are kept in your browser (the list in localStora
 ```
 src/
   App.tsx                 layout, page titles and shared state
-  tabs/                   DashboardTab, AnalyzeTab, WatchlistTab, TrackerTab, FetchTab
+  tabs/                   DashboardTab, AnalyzeTab, WatchlistTab, TrackerTab, ReportTab, TestsTab, FetchTab
   components/             sidebar, stock picker, charts, cards, panels, passphrase dialog
   hooks/                  loading, watchlist, fetched stocks, URL state
   lib/analyze.ts          runs indicators, backtest and forecast for one stock
   lib/tracker.ts          saves daily sheets and compares them with actual prices
   lib/portfolio.ts        monthly paper portfolios and their returns
   lib/research/           backtest: forecast study, ranking signals and study, report
+  lib/tests/              trading-rule tests and Indian brokerage charges
   lib/data/               data loading, browser storage, tracking API, Yahoo parsing, symbols
   lib/indicators/         SMA, EMA, RSI, MACD and signal rules
   lib/models/             forecast models, blend and backtest
@@ -93,6 +96,7 @@ scripts/
   save-snapshot.ts        saves today's sheet
   build-tracker.ts        builds the Tracker's files
   research.ts             runs the research backtest
+  same-day-test.ts        same-day trading test for every built-in stock
   yahoo-fetch.ts          fetch with User-Agent header and retries
 worker/
   yahoo-proxy.ts          Cloudflare Worker: Yahoo relay and the tracked-stocks list

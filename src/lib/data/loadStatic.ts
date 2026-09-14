@@ -2,6 +2,7 @@ import type { Manifest } from '../../types.ts';
 import type { TrackerIndex, TrackerSheet, TrackerStock } from '../tracker.ts';
 import type { PortfolioReport } from '../portfolio.ts';
 import type { ResearchReport, ResearchScores } from '../research/research.ts';
+import type { SameDaySummary } from '../tests/sameDay.ts';
 import type { StockListFile } from './stockList.ts';
 import { fileId } from './symbols.ts';
 
@@ -14,7 +15,8 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T | null>
 
 export const loadResearchReport = (signal?: AbortSignal) => getJson<ResearchReport>('research/report.json', signal);
 export const loadResearchScores = (signal?: AbortSignal) => getJson<ResearchScores>('research/scores.json', signal);
-export const loadPortfolios = (signal?: AbortSignal) => getJson<PortfolioReport>('tracker/portfolios.json', signal);
+export const loadSameDaySummary = (signal?: AbortSignal) => getJson<SameDaySummary>('research/same-day.json', signal);
+export const loadPortfolios =(signal?: AbortSignal) => getJson<PortfolioReport>('tracker/portfolios.json', signal);
 export const loadStockList =(signal?: AbortSignal) => getJson<StockListFile>('data/nse-stocks.json', signal);
 export const loadManifest =(signal?: AbortSignal) => getJson<Manifest>('data/index.json', signal);
 export const loadTrackerIndex = (signal?: AbortSignal) => getJson<TrackerIndex>('tracker/index.json', signal);

@@ -14,6 +14,7 @@ import { AnalyzeTab } from './tabs/AnalyzeTab.tsx';
 import { DashboardTab } from './tabs/DashboardTab.tsx';
 import { FetchTab } from './tabs/FetchTab.tsx';
 import { ReportTab } from './tabs/ReportTab.tsx';
+import { TestsTab } from './tabs/TestsTab.tsx';
 import { TrackerTab } from './tabs/TrackerTab.tsx';
 import { WatchlistTab } from './tabs/WatchlistTab.tsx';
 
@@ -23,6 +24,7 @@ const PAGES: Record<Tab, { title: string; subtitle: string }> = {
   watchlist: { title: 'Watchlist', subtitle: 'Your starred stocks at a glance.' },
   tracker: { title: 'Tracker', subtitle: 'Saved daily predictions and monthly paper portfolios, compared with what actually happened.' },
   report: { title: 'Model report', subtitle: 'How the forecasts and stock rankings have actually performed, tested month by month.' },
+  tests: { title: 'Tests', subtitle: 'Try simple trading rules on real price history, including trading charges.' },
   fetch: { title: 'Fetch any stock', subtitle: 'Add NSE stocks to your Dashboard, and choose which ones to track daily.' },
 };
 
@@ -78,6 +80,9 @@ export default function App() {
         {tab === 'watchlist' && <WatchlistTab symbols={watchlist.symbols} onOpen={analyzeStock} onRemove={watchlist.toggle} />}
         {tab === 'tracker' && <TrackerTab symbol={symbol} onSelectSymbol={(next) => navigate({ symbol: next })} onAnalyze={analyzeStock} />}
         {tab === 'report' && <ReportTab />}
+        {tab === 'tests' && (
+          <TestsTab symbol={symbol} options={options} fetched={saved.stocks} onSelectSymbol={(next) => navigate({ symbol: next })} />
+        )}
         {tab === 'fetch' && <FetchTab options={options} saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
       </main>
     </div>

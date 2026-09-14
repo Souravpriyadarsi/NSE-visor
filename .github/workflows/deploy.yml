@@ -47,6 +47,11 @@ jobs:
         run: npm run research
         continue-on-error: true
 
+      # All-stocks table for the Tests page.
+      - name: Same-day trading test
+        run: npm run same-day-test
+        continue-on-error: true
+
       - name: Load saved prediction sheets
         env:
           GH_TOKEN: ${{ github.token }}

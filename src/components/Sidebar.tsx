@@ -13,6 +13,7 @@ const ITEMS: { tab: Tab; label: string; icon: ReactNode }[] = [
   { tab: 'watchlist', label: 'Watchlist', icon: icon(<path d="m10 2.5 2.3 4.7 5.2.8-3.8 3.6.9 5.2L10 14.4l-4.6 2.4.9-5.2L2.5 8l5.2-.8z" />) },
   { tab: 'tracker', label: 'Tracker', icon: icon(<><polyline points="2,14 7,9 11,11 18,5" /><polyline points="2,16 7,12 11,14 18,9" strokeDasharray="2 2" /></>) },
   { tab: 'report', label: 'Model report', icon: icon(<><path d="M4 17V10" /><path d="M10 17V4" /><path d="M16 17v-6" /><path d="M2 17h16" /></>) },
+  { tab: 'tests', label: 'Tests', icon: icon(<><path d="M7.5 2.5h5" /><path d="M8.5 2.5v5l-4.6 8.2a1 1 0 0 0 .9 1.5h10.4a1 1 0 0 0 .9-1.5l-4.6-8.2v-5" /><path d="M6 12.5h8" /></>) },
   { tab: 'fetch', label: 'Fetch any stock', icon: icon(<><path d="M10 3v10" /><polyline points="6,9 10,13 14,9" /><path d="M3 16h14" /></>) },
 ];
 

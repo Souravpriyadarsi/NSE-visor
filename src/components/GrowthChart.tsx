@@ -4,10 +4,12 @@ import { CHART_COLORS } from '../lib/chartTheme.ts';
 
 export type GrowthLine = { label: string; color: string; values: number[] };
 
-type Props = { dates: string[]; lines: GrowthLine[] };
+type Props = { dates: string[]; lines: GrowthLine[]; format?: (value: number) => string };
 
-/** Growth of ₹1 over time for a few portfolios. */
-export function GrowthChart({ dates, lines }: Props) {
+const growthOfOne = (value: number) => `₹${value.toFixed(2)}`;
+
+/** Money over time for a few portfolios or trading strategies. */
+export function GrowthChart({ dates, lines, format = growthOfOne }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Line'>[]>([]);
@@ -21,7 +23,6 @@ export function GrowthChart({ dates, lines }: Props) {
       grid: { vertLines: { color: CHART_COLORS.grid }, horzLines: { color: CHART_COLORS.grid } },
       rightPriceScale: { borderColor: CHART_COLORS.border },
       timeScale: { borderColor: CHART_COLORS.border },
-      localization: { priceFormatter: (p: number) => `₹${p.toFixed(2)}` },
     });
     return () => {
       chartRef.current?.remove();
@@ -33,6 +34,7 @@ export function GrowthChart({ dates, lines }: Props) {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
+    chart.applyOptions({ localization: { priceFormatter: format } });
     for (const series of seriesRef.current) chart.removeSeries(series);
     seriesRef.current = lines.map((line) => {
       const series = chart.addSeries(LineSeries, { color: line.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
@@ -40,7 +42,7 @@ export function GrowthChart({ dates, lines }: Props) {
       return series;
     });
     chart.timeScale().fitContent();
-  }, [dates, lines]);
+  }, [dates, lines, format]);
 
   return (
     <div>

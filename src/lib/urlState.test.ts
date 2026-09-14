@@ -17,7 +17,7 @@ describe('urlState', () => {
   });
 
   it('round-trips every tab and symbols with special characters', () => {
-    for (const tab of ['dashboard', 'analyze', 'watchlist', 'tracker', 'report', 'fetch'] as const) {
+    for (const tab of ['dashboard', 'analyze', 'watchlist', 'tracker', 'report', 'tests', 'fetch'] as const) {
       for (const symbol of ['^NSEI', 'M&M.NS', 'BAJAJ-AUTO.NS']) {
         expect(parseUrlState(buildSearch({ tab, symbol }))).toEqual({ tab, symbol });
       }
