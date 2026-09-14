@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { HistoryFile, Row } from '../../types.ts';
 import { affordableShares, orderCharges } from './costs.ts';
-import { sameDayTest } from './sameDay.ts';
+import { periodStart, sameDayTest } from './sameDay.ts';
 
 type Day = [date: string, open: number, close: number, volume?: number];
 
@@ -43,7 +43,7 @@ describe('sameDayTest', () => {
   ];
 
   it('compares overnight and intraday trading with holding, before charges', () => {
-    const result = sameDayTest(history(days), { amount: 10000, withCosts: false, days: Infinity })!;
+    const result = sameDayTest(history(days), { amount: 10000, withCosts: false, from: null })!;
     expect(result.dates).toEqual(['2026-01-01', '2026-01-02', '2026-01-05']);
     [10000, 10100, 10400].forEach((value, i) => expect(result.stock.values[i]).toBeCloseTo(value, 6));
     // Overnight: 100 shares bought at 100, sold at 102; then 100 shares at 101, sold at 101.
@@ -56,7 +56,7 @@ describe('sameDayTest', () => {
   });
 
   it('takes charges off every trade', () => {
-    const result = sameDayTest(history(days), { amount: 10000, withCosts: true, days: Infinity })!;
+    const result = sameDayTest(history(days), { amount: 10000, withCosts: true, from: null })!;
     expect(result.overnight.final).toBeLessThan(10200);
     expect(result.overnight.charges).toBeGreaterThan(2 * 15.34);
     expect(result.intraday.final).toBeLessThan(10196);
@@ -70,17 +70,20 @@ describe('sameDayTest', () => {
         ['2026-01-05', 150, 151],
         ['2026-01-06', 151, 152],
       ]),
-      { amount: 10000, withCosts: false, days: Infinity },
+      { amount: 10000, withCosts: false, from: null },
     )!;
     expect(jumpy.dates).toEqual(['2026-01-01', '2026-01-05', '2026-01-06']);
     expect(jumpy.overnight.skippedDays).toBe(1);
     expect(jumpy.stock.values[1]).toBe(10000);
 
-    const small = sameDayTest(history(days), { amount: 50, withCosts: false, days: Infinity })!;
+    const small = sameDayTest(history(days), { amount: 50, withCosts: false, from: null })!;
     expect(small.intraday.trades).toBe(0);
     expect(small.intraday.unaffordableDays).toBe(2);
     expect(small.intraday.final).toBe(50);
 
-    expect(sameDayTest(history(days), { amount: 10000, withCosts: false, days: 1 })!.dates).toEqual(['2026-01-02', '2026-01-05']);
+    expect(sameDayTest(history(days), { amount: 10000, withCosts: false, from: '2026-01-02' })!.dates).toEqual(['2026-01-02', '2026-01-05']);
+    expect(sameDayTest(history(days), { amount: 10000, withCosts: false, from: '2026-01-05' })).toBeNull();
+    expect(periodStart('1Y', '2026-09-11')).toBe('2025-09-11');
+    expect(periodStart('all', '2026-09-11')).toBeNull();
   });
 });

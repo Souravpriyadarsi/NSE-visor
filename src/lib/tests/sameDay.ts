@@ -1,17 +1,24 @@
 import type { HistoryFile } from '../../types.ts';
 import { SUSPICIOUS_LOG_MOVE } from '../data/yahoo.ts';
+import { subtractMonths } from '../dates.ts';
 import { maxDrawdown } from '../stats.ts';
 import { affordableShares, orderCharges, type TradeKind } from './costs.ts';
 
 export const TEST_AMOUNTS = [5000, 10000] as const;
 
 export type PeriodKey = '1Y' | '3Y' | '5Y' | 'all';
-export const TEST_PERIODS: { key: PeriodKey; label: string; days: number }[] = [
-  { key: '1Y', label: '1 year', days: 252 },
-  { key: '3Y', label: '3 years', days: 756 },
-  { key: '5Y', label: '5 years', days: 1260 },
-  { key: 'all', label: 'All', days: Number.POSITIVE_INFINITY },
+export const TEST_PERIODS: { key: PeriodKey; label: string; months: number | null }[] = [
+  { key: '1Y', label: '1 year', months: 12 },
+  { key: '3Y', label: '3 years', months: 36 },
+  { key: '5Y', label: '5 years', months: 60 },
+  { key: 'all', label: 'All', months: null },
 ];
+
+/** Start date for a preset period ending at lastDate; null means all history. */
+export function periodStart(period: PeriodKey, lastDate: string): string | null {
+  const months = TEST_PERIODS.find((p) => p.key === period)!.months;
+  return months == null ? null : subtractMonths(lastDate, months);
+}
 
 export type SeriesResult = {
   /** Money at the end of each trading day, starting with the amount. */
@@ -33,7 +40,8 @@ export type StrategyResult = SeriesResult & {
 };
 
 export type SameDayResult = { dates: string[]; stock: SeriesResult; overnight: StrategyResult; intraday: StrategyResult };
-export type SameDayOptions = { amount: number; withCosts: boolean; days: number };
+/** from: first trading day to include (YYYY-MM-DD), or null for all history. */
+export type SameDayOptions = { amount: number; withCosts: boolean; from: string | null };
 
 /** public/research/same-day.json: total returns per stock for every amount, charges setting and period. */
 export type SameDaySummary = {
@@ -63,14 +71,13 @@ function summarize(values: number[], amount: number): SeriesResult {
 }
 
 /**
- * Trades the stock every day over the last `days` trading days, reinvesting everything in whole shares:
+ * Trades the stock every day from the start date, reinvesting everything in whole shares:
  * overnight buys at each close and sells at the next open; intraday buys at each open and sells at that close.
  * The holding line simply follows the closing price, with no charges.
  */
-export function sameDayTest(history: HistoryFile, { amount, withCosts, days }: SameDayOptions): SameDayResult | null {
+export function sameDayTest(history: HistoryFile, { amount, withCosts, from }: SameDayOptions): SameDayResult | null {
   // Yahoo adds zero-volume placeholder rows on some holidays; they have no real open or close.
-  const traded = history.rows.filter((row) => row[6] > 0 && row[1] > 0 && row[4] > 0);
-  const rows = traded.slice(Math.max(0, traded.length - 1 - days));
+  const rows = history.rows.filter((row) => row[6] > 0 && row[1] > 0 && row[4] > 0 && (from == null || row[0] >= from));
   if (rows.length < 2) return null;
 
   const charges = (value: number, side: 'buy' | 'sell', kind: TradeKind) => (withCosts ? orderCharges(value, side, kind) : 0);

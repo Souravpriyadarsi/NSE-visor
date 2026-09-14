@@ -1,7 +1,7 @@
 // Same-day trading test for every built-in stock: each starting amount, with and without charges, over each period.
 // Writes public/research/same-day.json for the Tests page's all-stocks table. Run `npm run fetch-data` first.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { sameDayTest, summaryKey, TEST_AMOUNTS, TEST_PERIODS, type SameDaySummary } from '../src/lib/tests/sameDay.ts';
+import { periodStart, sameDayTest, summaryKey, TEST_AMOUNTS, TEST_PERIODS, type SameDaySummary } from '../src/lib/tests/sameDay.ts';
 import type { HistoryFile, Manifest } from '../src/types.ts';
 
 const DATA_DIR = new URL('../public/data/', import.meta.url);
@@ -17,7 +17,7 @@ for (const entry of manifest.symbols.filter((e) => !e.symbol.startsWith('^'))) {
   for (const amount of TEST_AMOUNTS) {
     for (const withCosts of [true, false]) {
       for (const period of TEST_PERIODS) {
-        const result = sameDayTest(history, { amount, withCosts, days: period.days });
+        const result = sameDayTest(history, { amount, withCosts, from: periodStart(period.key, history.lastDate) });
         if (result) {
           results[summaryKey(amount, withCosts, period.key)] = [
             round(result.stock.totalReturn),
