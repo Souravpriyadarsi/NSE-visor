@@ -32,7 +32,7 @@ type Props = { symbol: string; options: PickerOption[]; fetched: SymbolInfo[]; o
 /** Below this price, the bid-ask spread makes open/close trading results unreliable. */
 const LOW_PRICE = 20;
 
-const rupees = (value: number) => `${value < 0 ? '−' : ''}₹${Math.abs(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const rupees = (value: number) => `${value < 0 ? '-' : ''}₹${Math.abs(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const signedRupees = (value: number) => (value > 0 ? `+${rupees(value)}` : rupees(value));
 const signedPct = (value: number | null | undefined) => (value == null || !Number.isFinite(value) ? '—' : formatPct(value, true));
 const tone = (value: number | null | undefined) => (value == null ? '' : value > 0 ? 'text-emerald-400' : value < 0 ? 'text-rose-400' : '');
@@ -273,8 +273,30 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
   );
 }
 
-type SummaryRow = SymbolInfo & { holding: number | null; overnight: number | null; intraday: number | null; note: string | null };
-type SortColumn = 'symbol' | 'holding' | 'overnight' | 'intraday';
+/** Returns are fractions of the starting value (shares × first day's close). */
+type SummaryRow = SymbolInfo & {
+  startValue: number | null;
+  holding: number | null;
+  overnight: number | null;
+  intraday: number | null;
+  note: string | null;
+};
+type SortColumn = 'symbol' | 'startValue' | 'holding' | 'overnight' | 'intraday';
+
+function ProfitCell({ fraction, startValue }: { fraction: number | null; startValue: number | null }) {
+  return (
+    <td className={`py-2 pr-3 text-right tabular-nums ${tone(fraction)}`}>
+      {fraction == null ? (
+        '—'
+      ) : (
+        <>
+          <span className="block font-medium">{startValue == null ? signedPct(fraction) : signedRupees(fraction * startValue)}</span>
+          {startValue != null && <span className="block text-[11px] opacity-80">{signedPct(fraction)}</span>}
+        </>
+      )}
+    </td>
+  );
+}
 type AllStocksProps = { settings: Settings; fetched: SymbolInfo[]; selected: string; onSelect: (symbol: string) => void };
 
 function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
@@ -301,11 +323,19 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
 
   const calculatedRow = (stock: SymbolInfo, loaded: LoadedHistory | undefined): SummaryRow => {
     if (loaded?.status !== 'ready') {
-      return { ...stock, holding: null, overnight: null, intraday: null, note: loaded?.status === 'error' ? loaded.message : 'Loading…' };
+      return {
+        ...stock,
+        startValue: null,
+        holding: null,
+        overnight: null,
+        intraday: null,
+        note: loaded?.status === 'error' ? loaded.message : 'Loading…',
+      };
     }
     const r = testOf(stock.symbol, loaded.history);
     return {
       ...stock,
+      startValue: r?.startValue ?? null,
       holding: r?.stock.totalReturn ?? null,
       overnight: r?.overnight.totalReturn ?? null,
       intraday: r?.intraday.totalReturn ?? null,
@@ -318,7 +348,16 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
     const key = summaryKey(shares, withCosts, start.period);
     for (const s of builtIn) {
       const r = s.results[key];
-      list.push({ symbol: s.symbol, name: s.name, holding: r?.[0] ?? null, overnight: r?.[1] ?? null, intraday: r?.[2] ?? null, note: null });
+      const startClose = s.starts?.[start.period];
+      list.push({
+        symbol: s.symbol,
+        name: s.name,
+        startValue: startClose == null ? null : shares * startClose,
+        holding: r?.[0] ?? null,
+        overnight: r?.[1] ?? null,
+        intraday: r?.[2] ?? null,
+        note: null,
+      });
     }
   } else if (calculateAll) {
     for (const s of builtIn) list.push(calculatedRow({ symbol: s.symbol, name: s.name }, histories[s.symbol]));
@@ -334,14 +373,17 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
     return direction * (x - y);
   });
 
+  const staleSummary =
+    start.kind === 'preset' && builtIn.length > 0 && builtIn.every((s) => !s.results[summaryKey(shares, withCosts, start.period)]);
   const complete = rows.filter((r) => r.holding != null && r.overnight != null && r.intraday != null);
   const overnightBeatsIntraday = complete.filter((r) => r.overnight! > r.intraday!).length;
   const beatsHolding = complete.filter((r) => Math.max(r.overnight!, r.intraday!) > r.holding!).length;
 
-  const header = (column: SortColumn, label: string, numeric = true) => (
+  const header = (column: SortColumn, label: string, numeric = true, hint?: string) => (
     <th className={`py-2 pr-3 font-medium whitespace-nowrap ${numeric ? 'text-right' : 'text-left'}`}>
       <button
         type="button"
+        title={hint}
         className="hover:text-ink-200"
         onClick={() => setSort((s) => ({ column, descending: s.column === column ? !s.descending : column !== 'symbol' }))}
       >
@@ -354,8 +396,11 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
   return (
     <Card
       title="All stocks"
-      subtitle={`Return on ${shares} shares per trade ${describeStart(start)}, ${withCosts ? 'after' : 'before'} charges, as a share of each stock's starting value. Click a stock to chart it.`}
+      subtitle={`Profit or loss on ${shares} shares per trade ${describeStart(start)}, ${withCosts ? 'after' : 'before'} charges. The starting value is ${shares} shares at the first day's close, and percentages are measured against it. Click a stock to chart it.`}
     >
+      {staleSummary && (
+        <p className="mb-3 text-xs text-orange-300">This table's data is from an older version of the site. Refresh the page to load the latest.</p>
+      )}
       {!custom && summary.status === 'ready' && !summary.data && (
         <p className="mb-3 text-xs text-ink-500">
           The built-in stocks' table comes from the daily update. Running locally? Run <code>npm run same-day-test</code>.
@@ -397,13 +442,14 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
         !custom && <p className="text-sm text-ink-400">No stocks to show.</p>
       ) : (
         <div className="scroll-area max-h-[60vh]">
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="w-full min-w-[600px] text-sm">
             <thead className="sticky top-0 z-10 bg-ink-900">
               <tr className="text-xs text-ink-400">
                 {header('symbol', 'Stock', false)}
-                {header('holding', 'Holding')}
-                {header('overnight', 'Close → next open')}
-                {header('intraday', 'Open → close')}
+                {header('startValue', 'Starting value', true, "Shares × the first day's close")}
+                {header('holding', 'Holding', true, 'Sorts by percentage')}
+                {header('overnight', 'Close → next open', true, 'Sorts by percentage')}
+                {header('intraday', 'Open → close', true, 'Sorts by percentage')}
               </tr>
             </thead>
             <tbody>
@@ -421,10 +467,9 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
                     <span className="block font-medium">{displaySymbol(r.symbol)}</span>
                     <span className="block max-w-56 truncate text-xs text-ink-400">{r.note ?? r.name}</span>
                   </td>
-                  {[r.holding, r.overnight, r.intraday].map((value, n) => (
-                    <td key={n} className={`py-2 pr-3 text-right tabular-nums ${tone(value)}`}>
-                      {signedPct(value)}
-                    </td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-ink-300">{r.startValue == null ? '—' : rupees(r.startValue)}</td>
+                  {[r.holding, r.overnight, r.intraday].map((fraction, n) => (
+                    <ProfitCell key={n} fraction={fraction} startValue={r.startValue} />
                   ))}
                 </tr>
               ))}

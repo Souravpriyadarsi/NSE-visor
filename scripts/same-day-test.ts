@@ -14,11 +14,13 @@ const summary: SameDaySummary = { generatedAt: new Date().toISOString(), stocks:
 for (const entry of manifest.symbols.filter((e) => !e.symbol.startsWith('^'))) {
   const history = JSON.parse(await readFile(new URL(entry.file, DATA_DIR), 'utf8')) as HistoryFile;
   const results: SameDaySummary['stocks'][number]['results'] = {};
+  const starts: SameDaySummary['stocks'][number]['starts'] = {};
   for (const shares of TEST_SHARES) {
     for (const withCosts of [true, false]) {
       for (const period of TEST_PERIODS) {
         const result = sameDayTest(history, { shares, withCosts, from: periodStart(period.key, history.lastDate) });
         if (result) {
+          starts[period.key] = Number((result.startValue / shares).toFixed(2));
           results[summaryKey(shares, withCosts, period.key)] = [
             round(result.stock.totalReturn),
             round(result.overnight.totalReturn),
@@ -28,7 +30,7 @@ for (const entry of manifest.symbols.filter((e) => !e.symbol.startsWith('^'))) {
       }
     }
   }
-  summary.stocks.push({ symbol: entry.symbol, name: entry.name, results });
+  summary.stocks.push({ symbol: entry.symbol, name: entry.name, starts, results });
 }
 
 await mkdir(OUT_DIR, { recursive: true });

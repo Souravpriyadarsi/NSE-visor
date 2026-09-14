@@ -54,7 +54,13 @@ export type SameDayOptions = { shares: number; withCosts: boolean; from: string 
 /** public/research/same-day.json: returns per stock for every share count, charges setting and period. */
 export type SameDaySummary = {
   generatedAt: string;
-  stocks: { symbol: string; name: string; results: Record<string, [holding: number, overnight: number, intraday: number]> }[];
+  stocks: {
+    symbol: string;
+    name: string;
+    /** Closing price on each period's first trading day; times the share count gives the starting value. */
+    starts: Partial<Record<PeriodKey, number>>;
+    results: Record<string, [holding: number, overnight: number, intraday: number]>;
+  }[];
 };
 
 export const summaryKey = (shares: number, withCosts: boolean, period: PeriodKey) => `${shares}|${withCosts ? 'net' : 'gross'}|${period}`;

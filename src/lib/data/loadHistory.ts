@@ -43,7 +43,7 @@ export async function forgetHistory(symbol: string): Promise<void> {
 }
 
 async function loadBundled(symbol: string, signal?: AbortSignal): Promise<HistoryFile | null> {
-  const res = await fetch(`${import.meta.env.BASE_URL}data/${fileId(symbol)}.json`, { signal });
+  const res = await fetch(`${import.meta.env.BASE_URL}data/${fileId(symbol)}.json`, { signal, cache: 'no-cache' });
   const isJson = res.headers.get('content-type')?.includes('json') ?? false;
   return res.ok && isJson ? ((await res.json()) as HistoryFile) : null;
 }
