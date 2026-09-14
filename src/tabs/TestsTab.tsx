@@ -9,14 +9,14 @@ import { CHART_COLORS } from '../lib/chartTheme.ts';
 import { loadSameDaySummary } from '../lib/data/loadStatic.ts';
 import { displaySymbol } from '../lib/data/symbols.ts';
 import { exchangeClock, formatDate } from '../lib/dates.ts';
-import { formatPct } from '../lib/format.ts';
+import { formatPct, formatPrice } from '../lib/format.ts';
 import { CHARGES } from '../lib/tests/costs.ts';
 import {
   periodStart,
   sameDayTest,
   summaryKey,
-  TEST_AMOUNTS,
   TEST_PERIODS,
+  TEST_SHARES,
   type PeriodKey,
   type SameDayResult,
   type SeriesResult,
@@ -26,10 +26,14 @@ import type { HistoryFile, SymbolInfo } from '../types.ts';
 
 /** A preset period (ending at the latest close) or a start date picked by the user. */
 type Start = { kind: 'preset'; period: PeriodKey } | { kind: 'date'; date: string };
-type Settings = { amount: number; start: Start; withCosts: boolean };
+type Settings = { shares: number; start: Start; withCosts: boolean };
 type Props = { symbol: string; options: PickerOption[]; fetched: SymbolInfo[]; onSelectSymbol: (symbol: string) => void };
 
-const rupees = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+/** Below this price, the bid-ask spread makes open/close trading results unreliable. */
+const LOW_PRICE = 20;
+
+const rupees = (value: number) => `${value < 0 ? '−' : ''}₹${Math.abs(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const signedRupees = (value: number) => (value > 0 ? `+${rupees(value)}` : rupees(value));
 const signedPct = (value: number | null | undefined) => (value == null || !Number.isFinite(value) ? '—' : formatPct(value, true));
 const tone = (value: number | null | undefined) => (value == null ? '' : value > 0 ? 'text-emerald-400' : value < 0 ? 'text-rose-400' : '');
 const startFor = (start: Start, lastDate: string) => (start.kind === 'date' ? start.date : periodStart(start.period, lastDate));
@@ -39,11 +43,8 @@ function describeStart(start: Start): string {
   return start.period === 'all' ? 'over all price history' : `over ${TEST_PERIODS.find((p) => p.key === start.period)!.label}`;
 }
 
-/** Below this price, the bid-ask spread makes open/close trading results unreliable. */
-const LOW_PRICE = 20;
-
 const LINES = {
-  holding: { label: 'Holding the stock (no charges)', color: CHART_COLORS.price },
+  holding: { label: 'Holding the shares (no charges)', color: CHART_COLORS.price },
   overnight: { label: 'Buy at close, sell next open', color: CHART_COLORS.forecast },
   intraday: { label: 'Buy at open, sell at close', color: CHART_COLORS.sma50 },
 };
@@ -74,7 +75,7 @@ function Toggle<T extends string | number>(props: {
 }
 
 export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
-  const [settings, setSettings] = useState<Settings>({ amount: TEST_AMOUNTS[0], start: { kind: 'preset', period: '1Y' }, withCosts: true });
+  const [settings, setSettings] = useState<Settings>({ shares: 100, start: { kind: 'preset', period: '1Y' }, withCosts: true });
   const stockOptions = useMemo(() => options.filter((o) => !o.symbol.startsWith('^')), [options]);
   const update = (change: Partial<Settings>) => setSettings((current) => ({ ...current, ...change }));
 
@@ -88,15 +89,15 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
     <div className="space-y-6">
       <Card
         title="Same-day trading test"
-        subtitle="What if you traded a stock every single day, reinvesting everything? Buy at the close and sell at the next open, or buy at the open and sell at that day's close. Compared with simply holding the stock."
+        subtitle="What if you traded the same number of shares every single day? Buy at the close and sell at the next open, or buy at the open and sell at that day's close. Compared with simply holding the shares."
       >
         <div className="flex flex-wrap items-center gap-3">
           <StockPicker options={stockOptions} onSelect={onSelectSymbol} placeholder="Pick a stock to test" />
           <Toggle
-            label="Starting amount"
-            value={settings.amount}
-            choices={TEST_AMOUNTS.map((amount) => ({ value: amount, label: rupees(amount) }))}
-            onChange={(amount) => update({ amount })}
+            label="Shares per trade"
+            value={settings.shares}
+            choices={TEST_SHARES.map((shares) => ({ value: shares, label: `${shares} shares` }))}
+            onChange={(shares) => update({ shares })}
           />
           <Toggle
             label="Charges"
@@ -145,10 +146,10 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
 type StockTestProps = { symbol: string; state: HistoryState; retry: () => void; settings: Settings; from: string | null };
 
 function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
-  const { amount, withCosts } = settings;
+  const { shares, withCosts } = settings;
   const result = useMemo(
-    () => (state.status === 'ready' ? sameDayTest(state.history, { amount, withCosts, from }) : null),
-    [state, amount, withCosts, from],
+    () => (state.status === 'ready' ? sameDayTest(state.history, { shares, withCosts, from }) : null),
+    [state, shares, withCosts, from],
   );
   const lines = useMemo<GrowthLine[]>(
     () =>
@@ -185,12 +186,12 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
   }
 
   const tradingDays = result.dates.length - 1;
+  const startClose = result.startValue / shares;
   const rows: { label: string; color: string; series: SeriesResult; strategy: StrategyResult | null }[] = [
     { ...LINES.holding, series: result.stock, strategy: null },
     { ...LINES.overnight, series: result.overnight, strategy: result.overnight },
     { ...LINES.intraday, series: result.intraday, strategy: result.intraday },
   ];
-  const unaffordable = Math.max(result.overnight.unaffordableDays, result.intraday.unaffordableDays);
   const skipped = Math.max(result.overnight.skippedDays, result.intraday.skippedDays);
   const historyStartsLater = from != null && state.history.rows[0][0] > from;
   const lowestClose = Math.min(...state.history.rows.filter((row) => row[0] >= result.dates[0]).map((row) => row[4]));
@@ -198,7 +199,7 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
   return (
     <Card
       title={`${displaySymbol(symbol)} · ${state.history.name}`}
-      subtitle={`${rupees(amount)} from ${formatDate(result.dates[0])} to ${formatDate(result.dates[tradingDays])} (${tradingDays.toLocaleString('en-IN')} trading days), ${withCosts ? 'after' : 'before'} charges.`}
+      subtitle={`${shares} shares per trade from ${formatDate(result.dates[0])} to ${formatDate(result.dates[tradingDays])} (${tradingDays.toLocaleString('en-IN')} trading days), ${withCosts ? 'after' : 'before'} charges. Starting value ${rupees(result.startValue)} (${shares} × ${formatPrice(startClose, symbol)}).`}
     >
       <GrowthChart dates={result.dates} lines={lines} format={rupees} />
 
@@ -208,8 +209,10 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
             <tr className="text-xs whitespace-nowrap text-ink-400">
               <th className="py-2 pr-3 text-left font-medium">Strategy</th>
               <th className="py-2 pr-3 text-right font-medium">Final value</th>
-              <th className="py-2 pr-3 text-right font-medium">Return</th>
-              <th className="py-2 pr-3 text-right font-medium">Per year</th>
+              <th className="py-2 pr-3 text-right font-medium">Profit / loss</th>
+              <th className="py-2 pr-3 text-right font-medium" title="Profit or loss as a share of the starting value">
+                Return
+              </th>
               <th className="py-2 pr-3 text-right font-medium">Trades</th>
               <th className="py-2 pr-3 text-right font-medium">Charges paid</th>
               <th className="py-2 pr-3 text-right font-medium" title="Share of trades that made money after charges">
@@ -219,25 +222,28 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ label, color, series, strategy }) => (
-              <tr key={label} className="border-t border-ink-800">
-                <td className="py-2 pr-3">
-                  <span className="flex items-center gap-2">
-                    <span className="inline-block w-3 border-t-2" style={{ borderColor: color }} />
-                    {label}
-                  </span>
-                </td>
-                <td className="py-2 pr-3 text-right font-semibold tabular-nums">{rupees(series.final)}</td>
-                <td className={`py-2 pr-3 text-right tabular-nums ${tone(series.totalReturn)}`}>{signedPct(series.totalReturn)}</td>
-                <td className={`py-2 pr-3 text-right tabular-nums ${tone(series.annualReturn)}`}>{signedPct(series.annualReturn)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink-400">{strategy ? strategy.trades.toLocaleString('en-IN') : '—'}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink-400">{strategy ? rupees(strategy.charges) : '—'}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink-400">
-                  {strategy && strategy.trades ? formatPct(strategy.wins / strategy.trades) : '—'}
-                </td>
-                <td className="hidden py-2 text-right tabular-nums text-ink-400 xl:table-cell">{formatPct(-series.maxDrawdown)}</td>
-              </tr>
-            ))}
+            {rows.map(({ label, color, series, strategy }) => {
+              const profit = series.final - result.startValue;
+              return (
+                <tr key={label} className="border-t border-ink-800">
+                  <td className="py-2 pr-3">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-3 border-t-2" style={{ borderColor: color }} />
+                      {label}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3 text-right font-semibold tabular-nums">{rupees(series.final)}</td>
+                  <td className={`py-2 pr-3 text-right tabular-nums ${tone(profit)}`}>{signedRupees(profit)}</td>
+                  <td className={`py-2 pr-3 text-right tabular-nums ${tone(series.totalReturn)}`}>{signedPct(series.totalReturn)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-ink-400">{strategy ? strategy.trades.toLocaleString('en-IN') : '—'}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-ink-400">{strategy ? rupees(strategy.charges) : '—'}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-ink-400">
+                    {strategy && strategy.trades ? formatPct(strategy.wins / strategy.trades) : '—'}
+                  </td>
+                  <td className="hidden py-2 text-right tabular-nums text-ink-400 xl:table-cell">{formatPct(-series.maxDrawdown)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -261,11 +267,6 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
             {result.intraday.trades ? rupees(result.intraday.charges / result.intraday.trades) : '—'} intraday.
           </li>
         )}
-        {unaffordable > 0 && (
-          <li className="text-orange-300">
-            On {unaffordable.toLocaleString('en-IN')} days the money left couldn't buy even one share, so no trade was made.
-          </li>
-        )}
         {skipped > 0 && <li>{skipped} days with price jumps over 30% (usually unadjusted splits) were skipped.</li>}
       </ul>
     </Card>
@@ -276,17 +277,13 @@ type SummaryRow = SymbolInfo & { holding: number | null; overnight: number | nul
 type SortColumn = 'symbol' | 'holding' | 'overnight' | 'intraday';
 type AllStocksProps = { settings: Settings; fetched: SymbolInfo[]; selected: string; onSelect: (symbol: string) => void };
 
-/** A strategy that never traded (one share cost more than the amount) has no result, rather than 0%. */
-const tradedReturn = (value: number | undefined, trades: number | undefined) => (value == null || !trades ? null : value);
-
 function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
   const summary = useAsync((signal) => loadSameDaySummary(signal), []);
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'overnight', descending: true });
   const [calculateAll, setCalculateAll] = useState(false);
   const results = useRef(new Map<string, SameDayResult | null>());
-  const { amount, withCosts, start } = settings;
+  const { shares, withCosts, start } = settings;
   const custom = start.kind === 'date';
-  const cantBuy = `${rupees(amount)} can't buy one share`;
 
   const builtIn = summary.status === 'ready' ? (summary.data?.stocks ?? []) : [];
   // Stocks fetched in this browser aren't in the daily summary; with a custom start date, nothing is pre-calculated.
@@ -297,8 +294,8 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
 
   const testOf = (symbol: string, history: HistoryFile) => {
     const from = startFor(start, history.lastDate);
-    const key = `${symbol}|${amount}|${withCosts}|${from}`;
-    if (!results.current.has(key)) results.current.set(key, sameDayTest(history, { amount, withCosts, from }));
+    const key = `${symbol}|${shares}|${withCosts}|${from}`;
+    if (!results.current.has(key)) results.current.set(key, sameDayTest(history, { shares, withCosts, from }));
     return results.current.get(key)!;
   };
 
@@ -310,25 +307,18 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
     return {
       ...stock,
       holding: r?.stock.totalReturn ?? null,
-      overnight: tradedReturn(r?.overnight.totalReturn, r?.overnight.trades),
-      intraday: tradedReturn(r?.intraday.totalReturn, r?.intraday.trades),
-      note: !r ? 'No prices after the start date' : !r.overnight.trades && !r.intraday.trades ? cantBuy : null,
+      overnight: r?.overnight.totalReturn ?? null,
+      intraday: r?.intraday.totalReturn ?? null,
+      note: r ? null : 'No prices after the start date',
     };
   };
 
   const list: SummaryRow[] = [];
   if (start.kind === 'preset') {
-    const key = summaryKey(amount, withCosts, start.period);
+    const key = summaryKey(shares, withCosts, start.period);
     for (const s of builtIn) {
       const r = s.results[key];
-      list.push({
-        symbol: s.symbol,
-        name: s.name,
-        holding: r?.[0] ?? null,
-        overnight: tradedReturn(r?.[1], r?.[3]),
-        intraday: tradedReturn(r?.[2], r?.[4]),
-        note: r && !r[3] && !r[4] ? cantBuy : null,
-      });
+      list.push({ symbol: s.symbol, name: s.name, holding: r?.[0] ?? null, overnight: r?.[1] ?? null, intraday: r?.[2] ?? null, note: null });
     }
   } else if (calculateAll) {
     for (const s of builtIn) list.push(calculatedRow({ symbol: s.symbol, name: s.name }, histories[s.symbol]));
@@ -364,7 +354,7 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
   return (
     <Card
       title="All stocks"
-      subtitle={`Total return on ${rupees(amount)} ${describeStart(start)}, ${withCosts ? 'after' : 'before'} charges. Click a stock to chart it.`}
+      subtitle={`Return on ${shares} shares per trade ${describeStart(start)}, ${withCosts ? 'after' : 'before'} charges, as a share of each stock's starting value. Click a stock to chart it.`}
     >
       {!custom && summary.status === 'ready' && !summary.data && (
         <p className="mb-3 text-xs text-ink-500">
@@ -452,6 +442,10 @@ function ChargesCard() {
     <Card title="How the test works" subtitle="Charges are a typical discount broker's (Zerodha's published rates). Full-service brokers charge more.">
       <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-300">
         <li>
+          The same number of shares is bought and sold on every trade, and profits aren't reinvested. It assumes you always have enough money for
+          the trade. Returns are profit or loss divided by the shares' value at the first day's close.
+        </li>
+        <li>
           <strong className="text-ink-100">Buy at close, sell next open</strong> is a delivery trade (buy today, sell tomorrow): STT{' '}
           {pct(CHARGES.sttDelivery)} on both buy and sell, stamp duty {pct(CHARGES.stampDeliveryBuy)} on the buy, no brokerage, and a ₹
           {CHARGES.dpChargePerSell} DP charge on every sell.
@@ -463,12 +457,11 @@ function ChargesCard() {
         </li>
         <li>
           Both: NSE transaction charges {pct(CHARGES.exchangeRate)}, SEBI fees ₹10 per crore, and {pct(CHARGES.gstRate)} GST on brokerage,
-          transaction and SEBI charges.
+          transaction and SEBI charges. Flat charges (the DP charge and the ₹20 brokerage cap) weigh more on small positions.
         </li>
         <li>
-          Everything is reinvested each day in whole shares, at exactly the day's open or closing price. Real orders rarely fill exactly there,
-          and the gap between buying and selling prices (the bid-ask spread) isn't modelled, so results are better than you'd get. The gap
-          matters most for low-priced stocks, which can show unrealistic results here. Income tax isn't included.
+          Trades fill at exactly the day's open or closing price. Real orders rarely do, and the gap between buying and selling prices (the bid-ask
+          spread) isn't modelled, so results are better than you'd get. The gap matters most for low-priced stocks. Income tax isn't included.
         </li>
         <li>
           Prices aren't adjusted for dividends, so holding and overnight are both slightly understated. Holiday placeholder rows and jumps over 30%

@@ -29,17 +29,3 @@ export function orderCharges(value: number, side: 'buy' | 'sell', kind: TradeKin
   const dp = kind === 'delivery' && side === 'sell' ? c.dpChargePerSell : 0;
   return brokerage + stt + exchange + sebi + stamp + gst + dp;
 }
-
-/** The most whole shares whose cost plus charges fit in the cash. */
-export function affordableShares(cash: number, price: number, charges: (value: number) => number): number {
-  if (!(price > 0) || !(cash > 0)) return 0;
-  const fits = (shares: number) => shares * price + charges(shares * price) <= cash;
-  let shares = Math.floor(cash / price);
-  while (shares > 0 && !fits(shares)) {
-    const over = shares * price + charges(shares * price) - cash;
-    shares -= Math.max(1, Math.floor(over / price));
-  }
-  shares = Math.max(0, shares);
-  while (fits(shares + 1)) shares++;
-  return shares;
-}

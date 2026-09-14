@@ -19,6 +19,7 @@ const MAX_VISIBLE = 100;
 export function StockPicker({ options, onSelect, placeholder = 'Search stocks, e.g. TCS', allowCustom = true }: Props) {
   const id = useId();
   const listRef = useRef<HTMLUListElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -37,6 +38,8 @@ export function StockPicker({ options, onSelect, placeholder = 'Search stocks, e
     setOpen(false);
     setActive(0);
     setError('');
+    // Leave the box after picking, so it isn't left highlighted and the next click opens the list again.
+    inputRef.current?.blur();
     onSelect(symbol);
   }
 
@@ -94,7 +97,9 @@ export function StockPicker({ options, onSelect, placeholder = 'Search stocks, e
               setActive(0);
               setError('');
             }}
+            ref={inputRef}
             onFocus={() => setOpen(true)}
+            onClick={() => setOpen(true)}
             onBlur={() => setOpen(false)}
             onKeyDown={onKeyDown}
             className="w-full rounded-lg border border-ink-700 bg-ink-900 py-2 pr-3 pl-9 text-sm placeholder:text-ink-500 focus:border-accent-500 focus:outline-none"
