@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Graphite & Amber palette: ink = neutrals, accent = highlight. Chart colours live in src/lib/chartTheme.ts. */
+@theme {
+  --color-ink-50: #fafafa;
+  --color-ink-100: #ededed;
+  --color-ink-200: #d4d4d8;
+  --color-ink-300: #b4b4bb;
+  --color-ink-400: #9a9aa2;
+  --color-ink-500: #71717a;
+  --color-ink-600: #52525b;
+  --color-ink-700: #3a3a40;
+  --color-ink-800: #27272a;
+  --color-ink-900: #17171a;
+  --color-ink-950: #0e0e10;
+
+  --color-accent-50: #fff9e6;
+  --color-accent-100: #fef0c3;
+  --color-accent-200: #fde08a;
+  --color-accent-300: #fbcb4b;
+  --color-accent-400: #f8bd1f;
+  --color-accent-500: #f5b301;
+  --color-accent-600: #d49a00;
+  --color-accent-700: #a87a00;
+  --color-accent-800: #7a5900;
+  --color-accent-900: #4d3800;
+  --color-accent-950: #2b1f00;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ink-950 text-ink-100 antialiased;
+}
+
+/* Slim scrollbars in the app's colours instead of the browser's default. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+
+/* A scrollable table area. The gutter keeps room for the scrollbar so it never covers a column. */
+@utility scroll-area {
+  overflow: auto;
+  scrollbar-gutter: stable;
+}

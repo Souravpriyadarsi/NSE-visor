@@ -1,0 +1,16 @@
+{
+  // Cloudflare Worker that lets the hosted site fetch and track any NSE stock.
+  "name": "nse-yahoo-proxy",
+  "main": "yahoo-proxy.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "vars": {
+    // Sites allowed to use this Worker (browsers send the host in lowercase).
+    "ALLOWED_ORIGINS": "https://souravpriyadarsi.github.io,http://localhost:5173,http://localhost:4173"
+  },
+  "kv_namespaces": [
+    // Stores the list of tracked stocks. Create it with `npx wrangler kv namespace create TRACKED`
+    // and paste the id it prints below.
+    { "binding": "TRACKED", "id": "PASTE-KV-NAMESPACE-ID-HERE" }
+  ]
+}

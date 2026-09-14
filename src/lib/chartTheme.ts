@@ -1,0 +1,20 @@
+/** Chart colours for the Graphite & Amber theme (the app palette itself is in index.css). */
+export const CHART_COLORS = {
+  text: '#9a9aa2',
+  grid: 'rgba(58, 58, 64, 0.45)',
+  border: '#27272a',
+  guide: '#52525b',
+  price: '#d4d4d8',
+  sma50: '#60a5fa',
+  sma200: '#c084fc',
+  forecast: '#f5b301',
+  band: 'rgba(245, 179, 1, 0.55)',
+  rsi: '#c084fc',
+  macd: '#60a5fa',
+  signal: '#fb923c',
+  up: 'rgba(52, 211, 153, 0.5)',
+  down: 'rgba(248, 113, 113, 0.5)',
+  actual: '#d4d4d8',
+  predicted: '#f5b301',
+  path: '#60a5fa',
+} as const;

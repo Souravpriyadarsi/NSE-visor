@@ -1,0 +1,92 @@
+name: Fetch data, save prediction sheet and deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 11 * * 1-5' # 17:00 IST on weekdays, after NSE closes
+  workflow_dispatch:
+
+permissions:
+  contents: write # saves daily prediction sheets to the "predictions" branch
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - id: pages
+        uses: actions/configure-pages@v6
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Fetch NSE data from Yahoo Finance
+        run: npm run fetch-data
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+          # Cloudflare Worker URL (optional repository variable): adds stocks tracked from the app.
+          YAHOO_PROXY_URL: ${{ vars.YAHOO_PROXY_URL }}
+
+      - name: Load saved prediction sheets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code --heads "$remote" predictions > /dev/null; then
+            git clone --quiet --depth 1 --branch predictions --single-branch "$remote" snapshots
+          else
+            git init --quiet -b predictions snapshots
+            git -C snapshots remote add origin "$remote"
+          fi
+
+      - name: Save today's prediction sheet
+        run: npm run save-snapshot
+
+      - name: Push the sheet to the predictions branch
+        working-directory: snapshots
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No new sheet to save."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898699+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Prediction sheet $(date -u +%F)"
+          git push --quiet origin predictions
+
+      - name: Compare saved predictions with actual prices
+        run: npm run build-tracker
+
+      - name: Build site
+        run: npm run build
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          VITE_YAHOO_PROXY_URL: ${{ vars.YAHOO_PROXY_URL }}
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
