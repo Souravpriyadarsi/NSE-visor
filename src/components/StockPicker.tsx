@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { displaySymbol, resolveSymbol } from '../lib/data/symbols.ts';
+import { searchStocks } from '../lib/search.ts';
 import type { SymbolInfo } from '../types.ts';
 
 export type PickerOption = SymbolInfo & { badge?: string };
@@ -23,15 +24,7 @@ export function StockPicker({ options, onSelect, placeholder = 'Search stocks, e
   const [active, setActive] = useState(0);
   const [error, setError] = useState('');
 
-  const matches = useMemo(() => {
-    const query = text.trim().toLowerCase();
-    if (!query) return options.slice(0, MAX_VISIBLE);
-    const startsWith = (o: PickerOption) => displaySymbol(o.symbol).toLowerCase().startsWith(query);
-    return options
-      .filter((o) => displaySymbol(o.symbol).toLowerCase().includes(query) || o.name.toLowerCase().includes(query))
-      .sort((a, b) => Number(startsWith(b)) - Number(startsWith(a)))
-      .slice(0, MAX_VISIBLE);
-  }, [options, text]);
+  const matches = useMemo(() => searchStocks(options, text, MAX_VISIBLE), [options, text]);
 
   const showList = open && matches.length > 0;
 
@@ -111,7 +104,7 @@ export function StockPicker({ options, onSelect, placeholder = 'Search stocks, e
               id={`${id}-list`}
               ref={listRef}
               role="listbox"
-              className="absolute z-30 mt-1 max-h-72 w-full min-w-64 overflow-y-auto rounded-lg border border-ink-700 bg-ink-900 py-1 shadow-xl shadow-black/50"
+              className="absolute z-30 mt-1 max-h-80 w-full min-w-80 overflow-y-auto rounded-lg border border-ink-700 bg-ink-900 py-1 shadow-xl shadow-black/50"
             >
               {matches.map((option, i) => (
                 <li
@@ -127,7 +120,9 @@ export function StockPicker({ options, onSelect, placeholder = 'Search stocks, e
                     i === active ? 'bg-accent-500/15 text-white' : 'text-ink-300'
                   }`}
                 >
-                  <span className="w-24 shrink-0 font-medium">{displaySymbol(option.symbol)}</span>
+                  <span className="w-28 shrink-0 truncate font-medium" title={displaySymbol(option.symbol)}>
+                    {displaySymbol(option.symbol)}
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-xs text-ink-400">{option.name}</span>
                   {option.badge && (
                     <span className="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-400 uppercase">

@@ -6,7 +6,9 @@ import { useSavedStocks } from './hooks/useSavedStocks.ts';
 import { useUrlState } from './hooks/useUrlState.ts';
 import { useWatchlist } from './hooks/useWatchlist.ts';
 import { BUILT_IN_STOCKS } from './lib/data/loadHistory.ts';
-import { loadManifest } from './lib/data/loadStatic.ts';
+import { loadManifest, loadStockList } from './lib/data/loadStatic.ts';
+import { toListedStocks } from './lib/data/stockList.ts';
+import { NSE_INDICES } from './lib/data/symbols.ts';
 import type { Tab } from './lib/urlState.ts';
 import { AnalyzeTab } from './tabs/AnalyzeTab.tsx';
 import { DashboardTab } from './tabs/DashboardTab.tsx';
@@ -16,28 +18,41 @@ import { WatchlistTab } from './tabs/WatchlistTab.tsx';
 
 const PAGES: Record<Tab, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: "Today's sheet: every stock's latest close and where the model puts it in a month." },
-  analyze: { title: 'Analyze', subtitle: 'Forecast, backtest and technical indicators for one stock.' },
+  analyze: { title: 'Analyze', subtitle: 'Forecast, backtest and technical indicators for any NSE stock.' },
   watchlist: { title: 'Watchlist', subtitle: 'Your starred stocks at a glance.' },
   tracker: { title: 'Tracker', subtitle: 'Saved daily predictions compared with what actually happened.' },
-  fetch: { title: 'Fetch any stock', subtitle: "Add NSE stocks that aren't built in, and choose which ones to track daily." },
+  fetch: { title: 'Fetch any stock', subtitle: 'Add NSE stocks to your Dashboard, and choose which ones to track daily.' },
 };
+
+const SERIES_BADGES: Record<string, string> = { BE: 'BE', BZ: 'BZ' };
 
 export default function App() {
   const [{ tab, symbol }, navigate] = useUrlState();
   const watchlist = useWatchlist();
   const saved = useSavedStocks();
   const manifest = useAsync((signal) => loadManifest(signal), []);
+  const stockList = useAsync((signal) => loadStockList(signal), []);
 
-  // Stock picker options: built-in, then tracked daily, then fetched in this browser.
+  // Stock search: your own stocks first (built-in, tracked, fetched), then indices, then every NSE stock.
   const options = useMemo(() => {
-    const list: PickerOption[] = [...BUILT_IN_STOCKS];
-    const add = (stock: PickerOption) => !list.some((s) => s.symbol === stock.symbol) && list.push(stock);
+    const list: PickerOption[] = [];
+    const seen = new Set<string>();
+    const add = (stock: PickerOption) => {
+      if (seen.has(stock.symbol)) return;
+      seen.add(stock.symbol);
+      list.push(stock);
+    };
+    BUILT_IN_STOCKS.forEach((s) => add({ ...s, badge: 'Built-in' }));
     if (manifest.status === 'ready') {
       manifest.data?.symbols.filter((e) => e.source === 'tracked').forEach((e) => add({ symbol: e.symbol, name: e.name, badge: 'Tracked' }));
     }
     saved.stocks.forEach((s) => add({ ...s, badge: 'Fetched' }));
+    NSE_INDICES.forEach((s) => add({ symbol: s.symbol, name: 'NSE index', badge: 'Index' }));
+    if (stockList.status === 'ready' && stockList.data) {
+      toListedStocks(stockList.data).forEach((s) => add({ symbol: s.symbol, name: s.name, badge: SERIES_BADGES[s.series] }));
+    }
     return list;
-  }, [manifest, saved.stocks]);
+  }, [manifest, stockList, saved.stocks]);
 
   const analyzeStock = useCallback((next: string) => navigate({ tab: 'analyze', symbol: next }), [navigate]);
   const page = PAGES[tab];
@@ -58,7 +73,7 @@ export default function App() {
         {tab === 'analyze' && <AnalyzeTab symbol={symbol} options={options} watchlist={watchlist} onSelect={analyzeStock} />}
         {tab === 'watchlist' && <WatchlistTab symbols={watchlist.symbols} onOpen={analyzeStock} onRemove={watchlist.toggle} />}
         {tab === 'tracker' && <TrackerTab symbol={symbol} onSelectSymbol={(next) => navigate({ symbol: next })} onAnalyze={analyzeStock} />}
-        {tab === 'fetch' && <FetchTab saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
+        {tab === 'fetch' && <FetchTab options={options} saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
       </main>
     </div>
   );

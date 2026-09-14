@@ -8,7 +8,8 @@ import { summarize } from '../src/lib/analyze.ts';
 import { fileId, isValidSymbol, normalizeSymbol } from '../src/lib/data/symbols.ts';
 import { parseChart } from '../src/lib/data/yahoo.ts';
 import type { HistoryFile, Manifest, ManifestEntry, SymbolInfo } from '../src/types.ts';
-import { fetchChart, sleep } from './yahoo-fetch.ts';
+import { NSE_EQUITY_LIST_URL, parseEquityList, type StockListFile } from '../src/lib/data/stockList.ts';
+import { fetchChart, sleep, USER_AGENT } from './yahoo-fetch.ts';
 
 type Target = SymbolInfo & { source: ManifestEntry['source'] };
 
@@ -46,6 +47,28 @@ async function readManifest(): Promise<Manifest | null> {
   }
 }
 
+/** Saves NSE's list of every listed stock for the app's search. Keeps yesterday's list if NSE's download fails. */
+async function saveStockList(): Promise<void> {
+  let file: StockListFile | null = null;
+  try {
+    const res = await fetch(NSE_EQUITY_LIST_URL, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'text/csv' },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const stocks = parseEquityList(await res.text());
+    if (stocks.length < 1000) throw new Error(`only ${stocks.length} stocks in the file`);
+    file = { updatedAt: new Date().toISOString(), stocks };
+  } catch (err) {
+    console.warn(`Could not download NSE's stock list: ${err instanceof Error ? err.message : String(err)}`);
+    file = pagesUrl ? await getJson<StockListFile>(`${pagesUrl}/data/nse-stocks.json`) : null;
+    if (file) console.warn('      using the previously deployed list');
+  }
+  if (!file) return;
+  await writeFile(new URL('nse-stocks.json', OUT_DIR), JSON.stringify(file));
+  console.log(`NSE stock list: ${file.stocks.length} stocks\n`);
+}
+
 function toEntry(history: HistoryFile, source: Target['source'], file: string): ManifestEntry {
   const summary = summarize(history);
   return {
@@ -76,6 +99,7 @@ const targets: Target[] = requested.length
   : everything;
 
 await mkdir(OUT_DIR, { recursive: true });
+await saveStockList();
 const entries: ManifestEntry[] = [];
 const failed: string[] = [];
 let missing = 0;

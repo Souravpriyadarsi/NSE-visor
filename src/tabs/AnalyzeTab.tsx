@@ -28,10 +28,8 @@ export function AnalyzeTab({ symbol, options, watchlist, onSelect }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-400">
-          Pick a stock for its 1-month forecast. Not in the list? Add it from <strong className="text-ink-200">Fetch any stock</strong>.
-        </p>
-        <StockPicker options={options} onSelect={onSelect} />
+        <p className="text-sm text-ink-400">Search any NSE stock or index by company name or ticker.</p>
+        <StockPicker options={options} onSelect={onSelect} placeholder="Search NSE stocks, e.g. Tata" />
       </div>
 
       {state.status === 'loading' && <LoadingState />}

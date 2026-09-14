@@ -1,18 +1,19 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '../components/Card.tsx';
+import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
 import { PassphraseDialog } from '../components/PassphraseDialog.tsx';
 import { useLocalStorageState } from '../hooks/useLocalStorageState.ts';
 import type { SavedStocks } from '../hooks/useSavedStocks.ts';
 import type { Watchlist } from '../hooks/useWatchlist.ts';
 import { FRESH_FOR_MS } from '../lib/data/browserStore.ts';
 import { forgetHistory, isBuiltIn, LIVE_SOURCE, loadHistory } from '../lib/data/loadHistory.ts';
-import { displaySymbol, isValidSymbol, normalizeSymbol } from '../lib/data/symbols.ts';
+import { displaySymbol } from '../lib/data/symbols.ts';
 import { checkPassphrase, fetchTrackedList, setTracked, TRACKING_API, WrongPassphraseError } from '../lib/data/tracking.ts';
 import { formatDate } from '../lib/dates.ts';
 import { formatPrice } from '../lib/format.ts';
 import type { HistoryFile, SymbolInfo } from '../types.ts';
 
-type Props = { saved: SavedStocks; watchlist: Watchlist; onAnalyze: (symbol: string) => void };
+type Props = { options: PickerOption[]; saved: SavedStocks; watchlist: Watchlist; onAnalyze: (symbol: string) => void };
 
 type Status =
   | { kind: 'idle' }
@@ -28,8 +29,7 @@ const SMALL_BUTTON =
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const parsePassphrase = (stored: unknown) => (typeof stored === 'string' ? stored : null);
 
-export function FetchTab({ saved, watchlist, onAnalyze }: Props) {
-  const [text, setText] = useState('');
+export function FetchTab({ options, saved, watchlist, onAnalyze }: Props) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const busy = status.kind === 'loading';
 
@@ -59,14 +59,8 @@ export function FetchTab({ saved, watchlist, onAnalyze }: Props) {
     }
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const symbol = normalizeSymbol(text);
-    if (!isValidSymbol(symbol)) {
-      setStatus({ kind: 'error', message: 'Enter an NSE ticker such as IRFC, SUZLON or YESBANK.' });
-      return;
-    }
-    setText('');
+  function pick(symbol: string) {
+    if (busy) return;
     if (isBuiltIn(symbol)) setStatus({ kind: 'builtIn', symbol });
     else void fetchStock(symbol);
   }
@@ -120,23 +114,7 @@ export function FetchTab({ saved, watchlist, onAnalyze }: Props) {
         subtitle="Download 10 years of daily prices for a stock that isn't built in. It then works like every other stock: it appears in the stock pickers, on the Dashboard and can go on your watchlist."
       >
         {LIVE_SOURCE ? (
-          <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="NSE ticker, e.g. IRFC"
-              aria-label="NSE ticker"
-              disabled={busy}
-              className="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm uppercase placeholder:text-ink-500 placeholder:normal-case focus:border-accent-500 focus:outline-none sm:w-72"
-            />
-            <button
-              type="submit"
-              disabled={busy || !text.trim()}
-              className="rounded-lg bg-accent-600 px-4 py-2 text-sm font-medium text-ink-950 hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy ? 'Fetching…' : 'Fetch'}
-            </button>
-          </form>
+          <StockPicker options={options} onSelect={pick} placeholder="Search by company or ticker, e.g. railway" />
         ) : (
           <p className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-orange-200">
             Live fetching isn't set up on this site yet: it needs the small Cloudflare Worker in the{' '}
@@ -144,8 +122,9 @@ export function FetchTab({ saved, watchlist, onAnalyze }: Props) {
           </p>
         )}
         <p className="mt-2 text-xs text-ink-500">
-          Use the NSE ticker, the short code shown on nseindia.com (e.g. IRFC for Indian Railway Finance Corporation). Indices
-          start with ^, e.g. ^NSEBANK.
+          All {options.length.toLocaleString('en-IN')} NSE stocks and main indices are listed, refreshed every evening. BE and BZ
+          tags mark stocks in NSE's restricted trading series. A stock listed today and not in the list yet? Type its exact
+          ticker and press Enter.
         </p>
 
         <StatusMessage status={status} watchlist={watchlist} onAnalyze={onAnalyze} />

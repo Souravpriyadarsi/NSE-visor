@@ -6,7 +6,7 @@ A lightweight web app for NSE (India) stocks, with five pages in the sidebar:
 - **Analyze**: one stock's ~10-year price chart with a **1-month forecast** (22 trading days) and 80% likely range, a **backtest** over the last 6 months, and **technical indicators** (50/200-day averages, RSI, MACD) with plain-English signals.
 - **Watchlist**: your starred stocks at a glance. Click one to open it in Analyze.
 - **Tracker**: every weekday evening the day's forecasts are saved. The Tracker shows each saved prediction next to the actual price once its month has passed, as a chart and as tables by stock or by day. Predictions still inside their month show as pending.
-- **Fetch any stock**: add NSE stocks that aren't built in, and choose which ones to **track daily**.
+- **Fetch any stock**: search all ~2,500 NSE stocks by company name or ticker, add them to your Dashboard, and choose which ones to **track daily**. The Analyze search covers every NSE stock too.
 
 Built with TypeScript, React, Tailwind CSS v4, Vite and [lightweight-charts](https://github.com/tradingview/lightweight-charts). All the maths is plain TypeScript with no ML libraries.
 
@@ -25,7 +25,7 @@ Open the URL Vite prints. `fetch-data` builds the Dashboard's data; Analyze and 
 | `npm run dev` | Start the app |
 | `npm test` | Run the unit tests (Vitest) |
 | `npm run typecheck` | Type-check everything |
-| `npm run fetch-data` | Download every built-in and tracked stock to `public/data/`, with forecasts |
+| `npm run fetch-data` | Download NSE's full stock list, plus every built-in and tracked stock with forecasts, to `public/data/` |
 | `npm run fetch-data -- TCS INFY` | Download only some stocks |
 | `npm run save-snapshot` | Save today's forecasts to `snapshots/<date>.json` |
 | `npm run build-tracker` | Compare saved snapshots with actual prices into `public/tracker/` |
@@ -74,7 +74,7 @@ src/
   lib/indicators/         SMA, EMA, RSI, MACD and signal rules
   lib/models/             forecast models, blend and backtest
 scripts/
-  fetch-data.ts           downloads built-in and tracked stocks (runs in GitHub Actions)
+  fetch-data.ts           downloads NSE's stock list and built-in/tracked prices (runs in GitHub Actions)
   save-snapshot.ts        saves today's sheet
   build-tracker.ts        builds the Tracker's files
   yahoo-fetch.ts          fetch with User-Agent header and retries

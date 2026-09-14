@@ -29,6 +29,7 @@ describe('symbols', () => {
 
   it('shows friendly names', () => {
     expect(displaySymbol('^NSEI')).toBe('NIFTY 50');
+    expect(displaySymbol('^NSEBANK')).toBe('NIFTY BANK');
     expect(displaySymbol('TCS.NS')).toBe('TCS');
   });
 

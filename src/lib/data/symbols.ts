@@ -16,8 +16,33 @@ export function fileId(symbol: string): string {
   return symbol.replace(/[^A-Za-z0-9.-]/g, '_');
 }
 
+/** Main NSE indices that Yahoo Finance has 10-year daily data for. */
+export const NSE_INDICES: SymbolInfo[] = [
+  { symbol: '^NSEI', name: 'NIFTY 50' },
+  { symbol: '^NSMIDCP', name: 'NIFTY NEXT 50' },
+  { symbol: '^CNX100', name: 'NIFTY 100' },
+  { symbol: '^CNX200', name: 'NIFTY 200' },
+  { symbol: '^CRSLDX', name: 'NIFTY 500' },
+  { symbol: '^NSEMDCP50', name: 'NIFTY MIDCAP 50' },
+  { symbol: '^NSEBANK', name: 'NIFTY BANK' },
+  { symbol: '^CNXPSUBANK', name: 'NIFTY PSU BANK' },
+  { symbol: '^CNXIT', name: 'NIFTY IT' },
+  { symbol: '^CNXAUTO', name: 'NIFTY AUTO' },
+  { symbol: '^CNXPHARMA', name: 'NIFTY PHARMA' },
+  { symbol: '^CNXFMCG', name: 'NIFTY FMCG' },
+  { symbol: '^CNXMETAL', name: 'NIFTY METAL' },
+  { symbol: '^CNXREALTY', name: 'NIFTY REALTY' },
+  { symbol: '^CNXENERGY', name: 'NIFTY ENERGY' },
+  { symbol: '^CNXINFRA', name: 'NIFTY INFRA' },
+  { symbol: '^CNXPSE', name: 'NIFTY PSE' },
+  { symbol: '^CNXCONSUM', name: 'NIFTY CONSUMPTION' },
+  { symbol: '^INDIAVIX', name: 'INDIA VIX' },
+];
+
+const indexNames = new Map(NSE_INDICES.map((i) => [i.symbol, i.name]));
+
 export function displaySymbol(symbol: string): string {
-  return symbol === '^NSEI' ? 'NIFTY 50' : symbol.replace(/\.NS$/, '');
+  return indexNames.get(symbol) ?? symbol.replace(/\.NS$/, '');
 }
 
 /** Matches search text against known symbols and company names, else treats it as a ticker. */
