@@ -9,8 +9,7 @@
     "ALLOWED_ORIGINS": "https://souravpriyadarsi.github.io,http://localhost:5173,http://localhost:4173"
   },
   "kv_namespaces": [
-    // Stores the list of tracked stocks. Create it with `npx wrangler kv namespace create TRACKED`
-    // and paste the id it prints below.
-    { "binding": "TRACKED", "id": "PASTE-KV-NAMESPACE-ID-HERE" }
+    // Stores the list of tracked stocks (created with `npx wrangler kv namespace create TRACKED`).
+    { "binding": "TRACKED", "id": "40f43200e68d4720bf21d98674a9a426" }
   ]
 }
