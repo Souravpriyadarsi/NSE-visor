@@ -9,6 +9,7 @@ const icon = (path: ReactNode) => (
 
 const ITEMS: { tab: Tab; label: string; icon: ReactNode }[] = [
   { tab: 'dashboard', label: 'Dashboard', icon: icon(<><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="11" y="3" width="6" height="6" rx="1" /><rect x="3" y="11" width="6" height="6" rx="1" /><rect x="11" y="11" width="6" height="6" rx="1" /></>) },
+  { tab: 'prices', label: 'Prices', icon: icon(<><path d="M6 2.5v15" /><rect x="4" y="6" width="4" height="7" rx="0.5" /><path d="M14 2.5v15" /><rect x="12" y="8.5" width="4" height="5" rx="0.5" /></>) },
   { tab: 'analyze', label: 'Analyze', icon: icon(<polyline points="2,15 7,9 11,12 18,4" />) },
   { tab: 'watchlist', label: 'Watchlist', icon: icon(<path d="m10 2.5 2.3 4.7 5.2.8-3.8 3.6.9 5.2L10 14.4l-4.6 2.4.9-5.2L2.5 8l5.2-.8z" />) },
   { tab: 'tracker', label: 'Tracker', icon: icon(<><polyline points="2,14 7,9 11,11 18,5" /><polyline points="2,16 7,12 11,14 18,9" strokeDasharray="2 2" /></>) },

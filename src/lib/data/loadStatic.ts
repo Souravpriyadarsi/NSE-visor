@@ -1,6 +1,7 @@
 import type { Manifest } from '../../types.ts';
 import type { TrackerIndex, TrackerSheet, TrackerStock } from '../tracker.ts';
 import type { PortfolioReport } from '../portfolio.ts';
+import type { LongHistoryFile, PriceSummary } from '../prices.ts';
 import type { ResearchReport, ResearchScores } from '../research/research.ts';
 import type { SameDaySummary } from '../tests/sameDay.ts';
 import type { StockListFile } from './stockList.ts';
@@ -20,6 +21,9 @@ export const loadSameDaySummary = (signal?: AbortSignal) => getJson<SameDaySumma
 export const loadPortfolios =(signal?: AbortSignal) => getJson<PortfolioReport>('tracker/portfolios.json', signal);
 export const loadStockList =(signal?: AbortSignal) => getJson<StockListFile>('data/nse-stocks.json', signal);
 export const loadManifest =(signal?: AbortSignal) => getJson<Manifest>('data/index.json', signal);
+export const loadPriceSummary = (signal?: AbortSignal) => getJson<PriceSummary>('data/prices.json', signal);
+/** Only stocks with more than 10 years of prices in the daily update have one. */
+export const loadLongHistory = (symbol: string, signal?: AbortSignal) => getJson<LongHistoryFile>(`data/long/${fileId(symbol)}.json`, signal);
 export const loadTrackerIndex = (signal?: AbortSignal) => getJson<TrackerIndex>('tracker/index.json', signal);
 export const loadTrackerStock = (symbol: string, signal?: AbortSignal) =>
   getJson<TrackerStock>(`tracker/stocks/${fileId(symbol)}.json`, signal);

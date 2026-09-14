@@ -1,8 +1,9 @@
 # NSE Visor
 
-A lightweight web app for NSE (India) stocks, with five pages in the sidebar:
+A lightweight web app for NSE (India) stocks, with these pages in the sidebar:
 
 - **Dashboard**: today's sheet for every NIFTY 200 stock (latest close, predicted price in 1 month, expected change, chance of ending higher), plus each stock's research **Rank** and forecast **Trust** grade and the current market condition. Sortable and filterable.
+- **Prices**: a plain price chart for any stock over 1D, 1W, 1M, 3M, 6M, 1Y, 5Y or All (back to the first price on record, using monthly prices before the last 10 years), with the latest day's open, high, low, volume and 52-week range. Below it, every stock's price at the start of the time frame, its current price, and how much it has risen or fallen.
 - **Analyze**: one stock's ~10-year price chart with a **1-month forecast** (22 trading days) and 80% likely range, a **backtest** over the last 6 months, and **technical indicators** (50/200-day averages, RSI, MACD) with plain-English signals.
 - **Watchlist**: your starred stocks at a glance. Click one to open it in Analyze.
 - **Tracker**: every weekday evening the day's forecasts are saved. The Tracker shows each saved prediction next to the actual price once its month has passed, as a chart and as tables by stock or by day. Predictions still inside their month show as pending.
@@ -27,7 +28,7 @@ Open the URL Vite prints. `fetch-data` builds the Dashboard's data; Analyze and 
 | `npm run dev` | Start the app |
 | `npm test` | Run the unit tests (Vitest) |
 | `npm run typecheck` | Type-check everything |
-| `npm run fetch-data` | Download NSE's full stock list, plus every built-in and tracked stock with forecasts, to `public/data/` |
+| `npm run fetch-data` | Download NSE's full stock list, plus every built-in and tracked stock with forecasts, to `public/data/`. Also keeps monthly prices from before the last 10 years in `public/data/long/` (re-downloaded monthly, or after a split) and writes the Prices page table, `prices.json` |
 | `npm run fetch-data -- TCS INFY` | Download only some stocks |
 | `npm run research` | Replay ~8 years of monthly forecasts and rankings into `public/research/` (after `fetch-data`, takes a few minutes) |
 | `npm run same-day-test` | Build the Tests page's all-stocks table into `public/research/same-day.json` (after `fetch-data`) |
@@ -80,12 +81,13 @@ Fetched stocks and their prices are kept in your browser (the list in localStora
 ```
 src/
   App.tsx                 layout, page titles and shared state
-  tabs/                   DashboardTab, AnalyzeTab, WatchlistTab, TrackerTab, ReportTab, TestsTab, FetchTab
+  tabs/                   DashboardTab, PricesTab, AnalyzeTab, WatchlistTab, TrackerTab, ReportTab, TestsTab, FetchTab
   components/             sidebar, stock picker, charts, cards, panels, passphrase dialog
   hooks/                  loading, watchlist, fetched stocks, URL state
   lib/analyze.ts          runs indicators, backtest and forecast for one stock
   lib/tracker.ts          saves daily sheets and compares them with actual prices
   lib/portfolio.ts        monthly paper portfolios and their returns
+  lib/prices.ts           price changes over each time frame, long monthly history
   lib/research/           backtest: forecast study, ranking signals and study, report
   lib/tests/              trading-rule tests and Indian brokerage charges
   lib/data/               data loading, browser storage, tracking API, Yahoo parsing, symbols

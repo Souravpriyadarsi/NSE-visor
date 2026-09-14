@@ -13,6 +13,7 @@ import type { Tab } from './lib/urlState.ts';
 import { AnalyzeTab } from './tabs/AnalyzeTab.tsx';
 import { DashboardTab } from './tabs/DashboardTab.tsx';
 import { FetchTab } from './tabs/FetchTab.tsx';
+import { PricesTab } from './tabs/PricesTab.tsx';
 import { ReportTab } from './tabs/ReportTab.tsx';
 import { TestsTab } from './tabs/TestsTab.tsx';
 import { TrackerTab } from './tabs/TrackerTab.tsx';
@@ -20,6 +21,7 @@ import { WatchlistTab } from './tabs/WatchlistTab.tsx';
 
 const PAGES: Record<Tab, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: "Today's sheet: every stock's latest close, where the model puts it in a month, and its research rank." },
+  prices: { title: 'Prices', subtitle: 'Price history for any stock, and how much every stock has risen or fallen over any time frame.' },
   analyze: { title: 'Analyze', subtitle: 'Forecast, backtest, track record and technical indicators for any NSE stock.' },
   watchlist: { title: 'Watchlist', subtitle: 'Your starred stocks at a glance.' },
   tracker: { title: 'Tracker', subtitle: 'Saved daily predictions and monthly paper portfolios, compared with what actually happened.' },
@@ -76,7 +78,10 @@ export default function App() {
         {tab === 'dashboard' && (
           <DashboardTab manifest={manifest} scores={scores} fetched={saved.stocks} watchlist={watchlist} onOpen={analyzeStock} />
         )}
-        {tab === 'analyze' && <AnalyzeTab symbol={symbol} options={options} watchlist={watchlist} scores={scores} onSelect={analyzeStock} />}
+        {tab === 'prices' && (
+          <PricesTab symbol={symbol} options={options} fetched={saved.stocks} onSelectSymbol={(next) => navigate({ symbol: next })} />
+        )}
+        {tab === 'analyze' &&<AnalyzeTab symbol={symbol} options={options} watchlist={watchlist} scores={scores} onSelect={analyzeStock} />}
         {tab === 'watchlist' && <WatchlistTab symbols={watchlist.symbols} onOpen={analyzeStock} onRemove={watchlist.toggle} />}
         {tab === 'tracker' && <TrackerTab symbol={symbol} onSelectSymbol={(next) => navigate({ symbol: next })} onAnalyze={analyzeStock} />}
         {tab === 'report' && <ReportTab />}

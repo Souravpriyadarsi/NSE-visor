@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Card } from '../components/Card.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
+import { Toggle } from '../components/Toggle.tsx';
 import { useAsync } from '../hooks/useAsync.ts';
 import { useHistories, type LoadedHistory } from '../hooks/useHistories.ts';
 import { useHistory, type HistoryState } from '../hooks/useHistory.ts';
@@ -49,30 +50,6 @@ const LINES = {
   intraday: { label: 'Buy at open, sell at close', color: CHART_COLORS.sma50 },
 };
 
-function Toggle<T extends string | number>(props: {
-  label: string;
-  value: T | null;
-  choices: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="flex rounded-lg border border-ink-700 p-0.5" role="group" aria-label={props.label}>
-      {props.choices.map((choice) => (
-        <button
-          key={String(choice.value)}
-          type="button"
-          aria-pressed={choice.value === props.value}
-          onClick={() => props.onChange(choice.value)}
-          className={`rounded-md px-3 py-1 text-xs whitespace-nowrap ${
-            choice.value === props.value ? 'bg-ink-700 text-white' : 'text-ink-400 hover:text-ink-200'
-          }`}
-        >
-          {choice.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
   const [settings, setSettings] = useState<Settings>({ shares: 100, start: { kind: 'preset', period: '1Y' }, withCosts: true });

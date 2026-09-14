@@ -17,7 +17,8 @@ type YahooChartResponse = {
   };
 };
 
-export type ParseOptions = { symbol: string; name?: string; now?: Date };
+/** quiet: skip the price-jump warnings (monthly prices often move over 30%). */
+export type ParseOptions = { symbol: string; name?: string; now?: Date; quiet?: boolean };
 
 const MARKET_CLOSE_MINUTES = 15 * 60 + 30;
 /** One-day moves bigger than this are almost always splits, bonuses or demergers Yahoo hasn't adjusted. */
@@ -68,7 +69,7 @@ export function parseChart(json: unknown, options: ParseOptions): HistoryFile {
   }
   if (rows.length === 0) throw new Error(`No price data for ${symbol}`);
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 1; i < rows.length && !options.quiet; i++) {
     const move = Math.log(rows[i][4] / rows[i - 1][4]);
     if (Math.abs(move) > SUSPICIOUS_LOG_MOVE) {
       console.warn(`${symbol}: ${(move * 100).toFixed(0)}% log move on ${rows[i][0]}, possibly an unadjusted split or bonus`);

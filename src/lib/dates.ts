@@ -59,3 +59,14 @@ export function subtractMonths(date: string, months: number): string {
 export function formatDate(date: string): string {
   return parseDate(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
+
+/** "Jan 1996" */
+export function formatMonth(date: string): string {
+  return parseDate(date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+export function subtractDays(date: string, days: number): string {
+  const d = parseDate(date);
+  d.setUTCDate(d.getUTCDate() - days);
+  return toIsoDate(d);
+}

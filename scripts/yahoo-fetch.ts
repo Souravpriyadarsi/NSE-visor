@@ -5,9 +5,9 @@ export class SymbolNotFoundError extends Error {}
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Raw daily chart JSON for ~10 years. Yahoo rejects requests without a User-Agent (HTTP 429). */
-export async function fetchChart(symbol: string, retries = 3): Promise<unknown> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=10y&interval=1d`;
+/** Raw chart JSON, by default ~10 years of daily prices. Yahoo rejects requests without a User-Agent (HTTP 429). */
+export async function fetchChart(symbol: string, retries = 3, query = 'range=10y&interval=1d'): Promise<unknown> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
   let lastError: unknown = new Error(`Could not fetch ${symbol}`);
 
   for (let attempt = 0; attempt <= retries; attempt++) {

@@ -17,4 +17,8 @@ export const CHART_COLORS = {
   actual: '#d4d4d8',
   predicted: '#f5b301',
   path: '#60a5fa',
+  rise: '#34d399',
+  riseFill: 'rgba(52, 211, 153, 0.22)',
+  fall: '#f87171',
+  fallFill: 'rgba(248, 113, 113, 0.22)',
 } as const;
