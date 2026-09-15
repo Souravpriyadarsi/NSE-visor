@@ -27,19 +27,15 @@ export type Trade = {
   exitTime: number;
   exitPrice: number;
   reason: ExitReason;
-  /** Profit or loss at the filled prices, so after slippage but before charges. */
   gross: number;
-  /** What slippage cost on the entry and exit (already inside gross). */
-  slippage: number;
   charges: number;
   net: number;
   /** Net result in multiples of the amount at risk when entering. */
   r: number;
 };
 
-export type OpenPosition = Omit<Trade, 'exitTime' | 'exitPrice' | 'reason' | 'gross' | 'slippage' | 'charges' | 'net' | 'r'> & {
+export type OpenPosition = Omit<Trade, 'exitTime' | 'exitPrice' | 'reason' | 'gross' | 'charges' | 'net' | 'r'> & {
   entryCharges: number;
-  entrySlippage: number;
   /** Profit or loss at the latest close, before exit charges. */
   unrealized: number;
 };
@@ -103,15 +99,11 @@ export function simulate(
     let tradesToday = 0;
     let realizedToday = 0;
     let position: OpenPosition | null = null;
-    let entryIndex = start;
     pending = null;
     halted = false;
 
-    /** Exits at `raw`, less slippage for market orders (targets are limit orders, so they fill exactly). */
-    const exit = (raw: number, time: number, reason: ExitReason, slipped = true) => {
+    const exit = (price: number, time: number, reason: ExitReason) => {
       const p = position!;
-      const price = slipped ? raw * (1 - p.side * slip) : raw;
-      const slippage = p.entrySlippage + p.qty * Math.abs(price - raw);
       const exitCharges = orderCharges(p.qty * price, p.side === 1 ? 'sell' : 'buy', 'intraday');
       const gross = p.side * (price - p.entryPrice) * p.qty;
       const charges = p.entryCharges + exitCharges;
@@ -130,7 +122,6 @@ export function simulate(
         exitPrice: price,
         reason,
         gross,
-        slippage,
         charges,
         net,
         r: risked > 0 ? net / risked : 0,
@@ -146,7 +137,7 @@ export function simulate(
 
       // 1. Orders decided at the previous close fill at this open.
       if (pending === 'exit' && position) {
-        exit(o, time, 'signal');
+        exit(o * (1 - (position as OpenPosition).side * slip), time, 'signal');
       } else if (pending && pending !== 'exit' && !position) {
         const { side, stop } = pending;
         const fill = o * (1 + side * slip);
@@ -163,11 +154,9 @@ export function simulate(
             stop,
             target: targetR > 0 ? fill + side * targetR * Math.abs(fill - stop) : null,
             entryCharges: orderCharges(qty * fill, side === 1 ? 'buy' : 'sell', 'intraday'),
-            entrySlippage: qty * Math.abs(fill - o),
             unrealized: 0,
           };
           tradesToday++;
-          entryIndex = i;
         }
       }
       pending = null;
@@ -176,11 +165,11 @@ export function simulate(
       if (position) {
         const p: OpenPosition = position;
         if (p.side === 1) {
-          if (l <= p.stop) exit(Math.min(o, p.stop), time, 'stop');
-          else if (p.target != null && h >= p.target) exit(Math.max(o, p.target), time, 'target', false);
+          if (l <= p.stop) exit(Math.min(o, p.stop) * (1 - slip), time, 'stop');
+          else if (p.target != null && h >= p.target) exit(Math.max(o, p.target), time, 'target');
         } else {
-          if (h >= p.stop) exit(Math.max(o, p.stop), time, 'stop');
-          else if (p.target != null && l <= p.target) exit(Math.min(o, p.target), time, 'target', false);
+          if (h >= p.stop) exit(Math.max(o, p.stop) * (1 + slip), time, 'stop');
+          else if (p.target != null && l <= p.target) exit(Math.min(o, p.target), time, 'target');
         }
       }
 
@@ -191,13 +180,13 @@ export function simulate(
       if (position) {
         const p: OpenPosition = position;
         p.unrealized = p.side * (c - p.entryPrice) * p.qty;
-        const closePrice = c;
+        const closePrice = c * (1 - p.side * slip);
         if (killed) exit(closePrice, time, 'kill');
         else if (minuteEnd >= risk.squareOffMinute || (lastBar && !liveSession)) exit(closePrice, time, 'day-end');
         else if (realizedToday + p.unrealized - p.entryCharges <= -risk.dailyLossLimit * risk.capital) {
           exit(closePrice, time, 'loss-limit');
           halted = true;
-        } else if (strategy.exit?.({ data, i, params, tradesToday, side: p.side, barsHeld: i - entryIndex })) pending = 'exit';
+        } else if (strategy.exit?.({ data, i, params, tradesToday, side: p.side })) pending = 'exit';
       }
       if (realizedToday <= -risk.dailyLossLimit * risk.capital) halted = true;
 

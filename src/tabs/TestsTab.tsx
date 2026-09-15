@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react';
-import { BreakEvenCalculator } from '../components/BreakEvenCalculator.tsx';
 import { Card } from '../components/Card.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
@@ -116,7 +115,6 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
         <StockTest symbol={symbol} state={state} retry={retry} settings={settings} from={from} />
       )}
       <AllStocks settings={settings} fetched={fetched} selected={symbol} onSelect={onSelectSymbol} />
-      <BreakEvenCalculator />
       <ChargesCard />
     </div>
   );
