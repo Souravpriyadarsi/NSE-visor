@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { angelDevApi } from './scripts/angel/devPlugin.ts';
 import { fetchChart, SymbolNotFoundError } from './scripts/yahoo-fetch.ts';
 import { chartRequest } from './src/lib/data/chartQuery.ts';
 import { isValidSymbol } from './src/lib/data/symbols.ts';
@@ -43,5 +44,5 @@ function yahooDevRelay(): Plugin {
 
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
-  plugins: [react(), tailwindcss(), yahooDevRelay()],
+  plugins: [react(), tailwindcss(), yahooDevRelay(), angelDevApi()],
 });

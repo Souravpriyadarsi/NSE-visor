@@ -3,6 +3,7 @@ import { Card } from './Card.tsx';
 import { IntradayChart } from './IntradayChart.tsx';
 import { StockPicker, type PickerOption } from './StockPicker.tsx';
 import { Toggle } from './Toggle.tsx';
+import { usePriceSource } from '../hooks/useAngel.ts';
 import { useIntraday } from '../hooks/useIntraday.ts';
 import { useLocalStorageState } from '../hooks/useLocalStorageState.ts';
 import { displaySymbol } from '../lib/data/symbols.ts';
@@ -56,7 +57,8 @@ export function PaperTrader({ options, research }: Props) {
   const running = windows.some((w) => w.until == null);
   const lastStop = windows.length ? windows[windows.length - 1] : null;
   const activeToday = windows.some((w) => w.until == null || istDate(w.until) === today);
-  const histories = useIntraday(settings.symbols, '5d', activeToday && !afterClose);
+  const source = usePriceSource();
+  const histories = useIntraday(settings.symbols, '5d', activeToday && !afterClose, source);
   const strategy = strategyById(settings.strategy);
   const researchFor = (symbol: string) => research?.stocks.find((s) => s.symbol === symbol)?.results[settings.strategy];
 
@@ -265,7 +267,7 @@ export function PaperTrader({ options, research }: Props) {
         <span className="flex items-center gap-2 text-xs text-ink-400">
           <span className={`inline-block h-2 w-2 rounded-full ${running ? 'bg-emerald-400' : 'bg-ink-600'}`} />
           {status}
-          {lastUpdate > 0 && ` · prices from ${istTime(Math.floor(lastUpdate / 1000))}`}
+          {lastUpdate > 0 && ` · ${source === 'angel' ? 'Angel One' : 'Yahoo'} prices from ${istTime(Math.floor(lastUpdate / 1000))}`}
         </span>
       </div>
       {!running && lastStop && istDate(lastStop.until!) === today && (

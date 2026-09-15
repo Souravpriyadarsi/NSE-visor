@@ -41,6 +41,13 @@ jobs:
           # Cloudflare Worker URL (optional repository variable): adds stocks tracked from the app.
           YAHOO_PROXY_URL: ${{ vars.YAHOO_PROXY_URL }}
 
+      # Angel One's NSE instrument tokens (public, no login) for the app's optional Angel One market data.
+      - name: Angel One instrument tokens
+        run: npm run angel-tokens
+        continue-on-error: true
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+
       # Replays ~8 years of monthly forecasts and stock rankings for the Model Report page.
       # If it fails, the site still deploys without the report.
       - name: Research backtest

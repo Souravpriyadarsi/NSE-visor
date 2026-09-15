@@ -9,7 +9,7 @@ A lightweight web app for NSE (India) stocks, with these pages in the sidebar:
 - **Tracker**: every weekday evening the day's forecasts are saved. The Tracker shows each saved prediction next to the actual price once its month has passed, as a chart and as tables by stock or by day. Predictions still inside their month show as pending.
 - **Model report**: an honest, month-by-month backtest over the NIFTY 200 with the last 2 years sealed as a final test: how accurate the forecasts and ranges have been against simple baselines, and which stock-ranking signals (momentum, low volatility and others) have beaten the average stock after trading costs.
 - **Tests**: trading-rule experiments on real prices with typical Indian brokerage charges. The first is the **same-day trading test**: for any stock and any start date, 50, 100 or 200 shares traded every day either overnight (buy at the close, sell at the next open) or intraday (buy at the open, sell at the close), charted against simply holding the stock, plus an all-stocks table.
-- **Day trading**: intraday strategies (opening-range breakout, VWAP pullback, moving-average crossover) backtested on ~60 days of 5-minute prices after Zerodha intraday charges and slippage, with settings chosen on the first two-thirds of the days and judged on the rest. A **paper trader** then runs a strategy on live 5-minute prices with hard risk limits (risk per trade, daily loss limit, 15:15 square-off) and a kill switch, and keeps a track record. Live orders through Zerodha Kite Connect are a later step.
+- **Day trading**: intraday strategies (opening-range breakout, VWAP pullback, moving-average crossover) backtested on ~60 days of 5-minute prices after Zerodha intraday charges and slippage, with settings chosen on the first two-thirds of the days and judged on the rest. A **paper trader** then runs a strategy on live 5-minute prices with hard risk limits (risk per trade, daily loss limit, 15:15 square-off) and a kill switch, and keeps a track record. Live orders through Zerodha Kite Connect are a later step. With a free Angel One account, the local app also shows live **market depth** and uses Angel One's official prices (see below).
 - **Fetch any stock**: search all ~2,500 NSE stocks by company name or ticker, add them to your Dashboard, and choose which ones to **track daily**. The Analyze search covers every NSE stock too.
 
 Built with TypeScript, React, Tailwind CSS v4, Vite and [lightweight-charts](https://github.com/tradingview/lightweight-charts). All the maths is plain TypeScript with no ML libraries.
@@ -34,6 +34,9 @@ Open the URL Vite prints. `fetch-data` builds the Dashboard's data; Analyze and 
 | `npm run research` | Replay ~8 years of monthly forecasts and rankings into `public/research/` (after `fetch-data`, takes a few minutes) |
 | `npm run same-day-test` | Build the Tests page's all-stocks table into `public/research/same-day.json` (after `fetch-data`) |
 | `npm run intraday-research` | Backtest the Day trading strategies for the NIFTY 50 on 5-minute prices into `public/research/intraday.json`, and keep finished days' bars in `snapshots/intraday/` |
+| `npm run intraday-research -- --source angel` | The same backtest on Angel One's ~100 days of 5-minute prices (needs `.env.local`) |
+| `npm run angel-tokens` | Save Angel One's NSE instrument tokens (public, no login) to `public/data/angel-tokens.json` |
+| `npm run angel-history -- RELIANCE --days 365` | Save Angel One 1-minute candles to `data-local/candles/` (needs `.env.local`; add `--interval 5m` for 5-minute) |
 | `npm run save-snapshot` | Save today's forecasts to `snapshots/<date>.json` |
 | `npm run build-tracker` | Compare saved snapshots with actual prices into `public/tracker/` |
 | `npm run build` | Build the static site into `dist/` |
@@ -75,9 +78,29 @@ The likely range uses "adaptive" volatility (recent days weigh more, and simulat
 | --- | --- | --- |
 | Built-in (`symbols.json`) and tracked | `public/data/` from `fetch-data`, or live via the dev server | Files built by the daily GitHub Action |
 | 5-minute prices (Day trading) | Live from Yahoo via the dev server | Live from Yahoo via your Cloudflare Worker. After updating the Worker's code, redeploy it: `npx wrangler deploy` in `worker/` |
+| Market depth and official intraday prices (optional) | Angel One SmartAPI through the dev server, using your `.env.local` | Not yet: the hosted site uses Yahoo |
 | Fetched in the Fetch page | Live from Yahoo via the dev server | Live from Yahoo via your Cloudflare Worker |
 
 Fetched stocks and their prices are kept in your browser (the list in localStorage, the prices in Cache Storage) and re-download once they're over 6 hours old.
+
+## Angel One market data (free, on your PC)
+
+Angel One's SmartAPI is free: live prices, **market depth** (best 5 bids and asks) and historical candles, with no subscription. The account is free to open and never needs money in it for paper trading (a Basic Services Demat Account with no holdings has no yearly fee). NSE Visor only reads market data; it has no code that places orders.
+
+1. Open an Angel One account.
+2. Sign in at [smartapi.angelbroking.com](https://smartapi.angelbroking.com), create an app (any redirect URL, such as `http://localhost`) and copy its API key.
+3. Turn on TOTP at [smartapi.angelbroking.com/enable-totp](https://smartapi.angelbroking.com/enable-totp) and copy the secret shown under the QR code (not the API secret).
+4. Copy `.env.example` to `.env.local` and fill in `ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN` and `ANGEL_TOTP_SECRET`. Optionally list up to 10 stocks in `ANGEL_RECORD` to save their depth every second during market hours to `data-local/depth/<date>/`.
+5. Restart `npm run dev`.
+
+What changes once it's set up:
+
+- **Day trading** shows a live market depth panel (bids, asks, spread, buyer/seller balance) for up to 5 stocks.
+- The Strategy lab and Paper trader use Angel One's 5-minute candles, with about 100 days of history instead of Yahoo's 60.
+- `.env.local` and `data-local/` are ignored by git, and your details never reach the browser: the dev server logs in (generating the TOTP code itself) and passes only market data on.
+- If a login fails it isn't retried automatically, because repeated wrong logins can lock an Angel One account. Fix `.env.local` and restart.
+
+Running it on the hosted site (through the Cloudflare Worker, behind your passphrase) is a later step.
 
 ## Project map
 
@@ -94,6 +117,7 @@ src/
   lib/research/           backtest: forecast study, ranking signals and study, report
   lib/tests/              trading-rule tests and Indian brokerage charges
   lib/intraday/           5-minute bars, intraday strategies, risk limits, simulator, walk-forward test, paper trader
+  lib/angel/              Angel One SmartAPI (market data only): TOTP login, candles, live depth parsing, instrument tokens
   lib/data/               data loading, browser storage, tracking API, Yahoo parsing, symbols
   lib/indicators/         SMA, EMA, RSI, MACD and signal rules
   lib/models/             forecast models, blend and backtest
@@ -104,6 +128,9 @@ scripts/
   research.ts             runs the research backtest
   same-day-test.ts        same-day trading test for every built-in stock
   intraday-research.ts    Day trading strategy backtest for the NIFTY 50
+  angel/                  local Angel One service for the dev server: login, price stream, depth recorder
+  angel-tokens.ts         Angel One NSE instrument tokens (runs in GitHub Actions)
+  angel-history.ts        saves Angel One candles to data-local/
   yahoo-fetch.ts          fetch with User-Agent header and retries
 worker/
   yahoo-proxy.ts          Cloudflare Worker: Yahoo relay and the tracked-stocks list

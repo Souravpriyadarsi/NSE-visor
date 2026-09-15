@@ -37,6 +37,15 @@ export function completedSessions(history: IntradayHistory): IntradaySession[] {
   return lastBarEnd >= MARKET_CLOSE_MINUTE ? sessions : sessions.slice(0, -1);
 }
 
+/** Adds sessions to saved ones by date, keeping whichever copy of a day has more bars. */
+export function mergeSessions(saved: IntradaySession[], added: IntradaySession[]): IntradaySession[] {
+  const byDate = new Map(saved.map((s) => [s.date, s]));
+  for (const session of added) {
+    if ((byDate.get(session.date)?.bars.length ?? 0) < session.bars.length) byDate.set(session.date, session);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 type Nullable = (number | null)[];
 
 type YahooIntradayResponse = {

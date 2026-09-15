@@ -1,11 +1,19 @@
 import { parseIntraday, WrongIntervalError, type IntradayHistory } from '../intraday/bars.ts';
+import { loadAngelCandles } from './angelSource.ts';
 import { LIVE_SOURCE, SymbolUnavailableError } from './loadHistory.ts';
 import { displaySymbol } from './symbols.ts';
 
 export type IntradayRange = '1d' | '5d' | '60d';
 
-/** 5-minute bars, live from Yahoo Finance through the dev server or the Cloudflare Worker. */
-export async function loadIntraday(symbol: string, range: IntradayRange, signal?: AbortSignal): Promise<IntradayHistory> {
+/** Yahoo Finance, or Angel One when it's set up locally (see .env.example). */
+export type PriceSource = 'yahoo' | 'angel';
+
+/** Calendar days of Angel One candles for each range. Angel One allows 100 days of 5-minute candles; Yahoo keeps 60. */
+const ANGEL_DAYS: Record<IntradayRange, number> = { '1d': 1, '5d': 8, '60d': 100 };
+
+/** 5-minute bars, from Angel One or live from Yahoo Finance through the dev server or the Cloudflare Worker. */
+export async function loadIntraday(symbol: string, range: IntradayRange, signal?: AbortSignal, source: PriceSource = 'yahoo'): Promise<IntradayHistory> {
+  if (source === 'angel') return loadAngelCandles(symbol, '5m', ANGEL_DAYS[range], signal);
   if (!LIVE_SOURCE) {
     throw new SymbolUnavailableError("Intraday prices come live through the Cloudflare Worker, which isn't set up on this site (see the README).");
   }

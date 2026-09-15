@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Card } from '../components/Card.tsx';
+import { DepthPanel } from '../components/DepthPanel.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
 import { IntradayChart } from '../components/IntradayChart.tsx';
 import { PaperTrader } from '../components/PaperTrader.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
 import { Toggle } from '../components/Toggle.tsx';
+import { usePriceSource } from '../hooks/useAngel.ts';
 import { useAsync, type AsyncState } from '../hooks/useAsync.ts';
 import { useIntraday } from '../hooks/useIntraday.ts';
 import { CHART_COLORS } from '../lib/chartTheme.ts';
@@ -38,6 +40,7 @@ export function DayTradingTab({ symbol, options, onSelectSymbol }: Props) {
 
   return (
     <div className="space-y-6">
+      <DepthPanel options={stockOptions} />
       <StrategyLab symbol={symbol} options={stockOptions} onSelectSymbol={onSelectSymbol} />
       <ResearchTable
         research={research}
@@ -79,7 +82,8 @@ function StrategyLab({ symbol, options, onSelectSymbol }: Props) {
   const [day, setDay] = useState<{ symbol: string; index: number } | null>(null);
 
   const isIndex = symbol.startsWith('^');
-  const loaded = useIntraday(isIndex ? [] : [symbol], '60d', false)[symbol];
+  const source = usePriceSource();
+  const loaded = useIntraday(isIndex ? [] : [symbol], '60d', false, source)[symbol];
   const history = loaded?.status === 'ready' ? loaded.history : null;
   const data = useMemo(() => (history ? prepareBars({ ...history, sessions: completedSessions(history) }) : null), [history]);
   const risk = useMemo(() => ({ ...DEFAULT_RISK, riskPerTrade, allowShort }), [riskPerTrade, allowShort]);
@@ -126,7 +130,8 @@ function StrategyLab({ symbol, options, onSelectSymbol }: Props) {
       <>
         <p className="mt-4 text-sm text-ink-300">
           <span className="font-medium text-ink-100">{displaySymbol(symbol)}</span> · {sessionCount} trading days from {formatDate(data.sessions[0].date)} to{' '}
-          {formatDate(data.sessions[sessionCount - 1].date)}. Settings are chosen on the days before {formatDate(selected.testFrom)}; the rest are unseen.
+          {formatDate(data.sessions[sessionCount - 1].date)}. Settings are chosen on the days before {formatDate(selected.testFrom)}; the rest are unseen. Prices from{' '}
+          {source === 'angel' ? 'Angel One' : 'Yahoo Finance'}.
         </p>
         <div className="scroll-area mt-3">
           <table className="w-full min-w-[680px] text-sm">
@@ -270,7 +275,7 @@ function StrategyLab({ symbol, options, onSelectSymbol }: Props) {
   return (
     <Card
       title="Strategy lab"
-      subtitle="Tests each strategy on about 60 trading days of 5-minute prices, after Zerodha intraday charges and slippage. Settings are chosen on the first two-thirds of the days; the last third played no part in that choice, so it's the honest test."
+      subtitle="Tests each strategy on the last few months of 5-minute prices (about 60 trading days from Yahoo, or about 70 from Angel One), after Zerodha intraday charges and slippage. Settings are chosen on the first two-thirds of the days; the last third played no part in that choice, so it's the honest test."
     >
       <div className="flex flex-wrap items-center gap-3">
         <StockPicker options={options} onSelect={onSelectSymbol} placeholder="Pick a stock to test" />

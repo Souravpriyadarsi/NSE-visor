@@ -8,3 +8,8 @@ snapshots
 .claude
 *.log
 .DS_Store
+
+# Local secrets (Angel One SmartAPI) and data recorded on this PC
+*.local
+.env.local
+data-local
