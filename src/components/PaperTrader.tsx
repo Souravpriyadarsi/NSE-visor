@@ -54,6 +54,7 @@ export function PaperTrader({ options, research }: Props) {
 
   const { settings, windows, record } = state;
   const running = windows.some((w) => w.until == null);
+  const lastStop = windows.length ? windows[windows.length - 1] : null;
   const activeToday = windows.some((w) => w.until == null || istDate(w.until) === today);
   const histories = useIntraday(settings.symbols, '5d', activeToday && !afterClose);
   const strategy = strategyById(settings.strategy);
@@ -267,8 +268,13 @@ export function PaperTrader({ options, research }: Props) {
           {lastUpdate > 0 && ` · prices from ${istTime(Math.floor(lastUpdate / 1000))}`}
         </span>
       </div>
-      {!running && windows.some((w) => w.until != null && istDate(w.until) === today) && (
-        <p className="mt-2 text-xs text-ink-500">Stopped: open positions are still managed until their stop, target or 15:15. Changing settings clears today's paper trades.</p>
+      {!running && lastStop && istDate(lastStop.until!) === today && (
+        <p className="mt-2 text-xs text-ink-500">
+          {lastStop.kill
+            ? `Kill switch used at ${istTime(lastStop.until!)}: every open position was closed at the last price.`
+            : 'Stopped: no new trades, but open positions are still managed until their stop, target or 15:15.'}{' '}
+          Changing settings clears today's paper trades.
+        </p>
       )}
 
       {settings.symbols.length > 0 && (
