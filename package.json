@@ -15,6 +15,7 @@
     "build-tracker": "node scripts/build-tracker.ts",
     "research": "node scripts/research.ts",
     "same-day-test": "node scripts/same-day-test.ts",
+    "intraday-research": "node scripts/intraday-research.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

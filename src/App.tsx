@@ -12,6 +12,7 @@ import { NSE_INDICES } from './lib/data/symbols.ts';
 import type { Tab } from './lib/urlState.ts';
 import { AnalyzeTab } from './tabs/AnalyzeTab.tsx';
 import { DashboardTab } from './tabs/DashboardTab.tsx';
+import { DayTradingTab } from './tabs/DayTradingTab.tsx';
 import { FetchTab } from './tabs/FetchTab.tsx';
 import { PricesTab } from './tabs/PricesTab.tsx';
 import { ReportTab } from './tabs/ReportTab.tsx';
@@ -27,6 +28,10 @@ const PAGES: Record<Tab, { title: string; subtitle: string }> = {
   tracker: { title: 'Tracker', subtitle: 'Saved daily predictions and monthly paper portfolios, compared with what actually happened.' },
   report: { title: 'Model report', subtitle: 'How the forecasts and stock rankings have actually performed, tested month by month.' },
   tests: { title: 'Tests', subtitle: 'Try simple trading rules on real price history, including trading charges.' },
+  daytrading: {
+    title: 'Day trading',
+    subtitle: 'Backtest intraday strategies on 5-minute prices, then let one paper-trade live prices under your risk limits.',
+  },
   fetch: { title: 'Fetch any stock', subtitle: 'Add NSE stocks to your Dashboard, and choose which ones to track daily.' },
 };
 
@@ -88,7 +93,8 @@ export default function App() {
         {tab === 'tests' && (
           <TestsTab symbol={symbol} options={options} fetched={saved.stocks} onSelectSymbol={(next) => navigate({ symbol: next })} />
         )}
-        {tab === 'fetch' && <FetchTab options={options} saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
+        {tab === 'daytrading' && <DayTradingTab symbol={symbol} options={options} onSelectSymbol={(next) => navigate({ symbol: next })} />}
+        {tab === 'fetch' &&<FetchTab options={options} saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
       </main>
     </div>
   );

@@ -15,6 +15,7 @@ const ITEMS: { tab: Tab; label: string; icon: ReactNode }[] = [
   { tab: 'tracker', label: 'Tracker', icon: icon(<><polyline points="2,14 7,9 11,11 18,5" /><polyline points="2,16 7,12 11,14 18,9" strokeDasharray="2 2" /></>) },
   { tab: 'report', label: 'Model report', icon: icon(<><path d="M4 17V10" /><path d="M10 17V4" /><path d="M16 17v-6" /><path d="M2 17h16" /></>) },
   { tab: 'tests', label: 'Tests', icon: icon(<><path d="M7.5 2.5h5" /><path d="M8.5 2.5v5l-4.6 8.2a1 1 0 0 0 .9 1.5h10.4a1 1 0 0 0 .9-1.5l-4.6-8.2v-5" /><path d="M6 12.5h8" /></>) },
+  { tab: 'daytrading', label: 'Day trading', icon: icon(<><circle cx="10" cy="10" r="7.5" /><polyline points="10,5.5 10,10 13,12" /></>) },
   { tab: 'fetch', label: 'Fetch any stock', icon: icon(<><path d="M10 3v10" /><polyline points="6,9 10,13 14,9" /><path d="M3 16h14" /></>) },
 ];
 

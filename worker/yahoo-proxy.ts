@@ -1,10 +1,12 @@
 // Cloudflare Worker for the hosted app:
 //   GET  /?symbol=IRFC.NS         relays Yahoo Finance daily prices (browsers can't call Yahoo directly)
+//   GET  /?symbol=X&interval=5m&range=5d   intraday prices for the Day trading page (see src/lib/data/chartQuery.ts)
 //   GET  /tracked                 the list of extra stocks the daily GitHub Action tracks
 //   PUT  /tracked  {symbol,name}  add a stock      (needs the passphrase)
 //   DELETE /tracked?symbol=X      remove a stock   (needs the passphrase)
 //   GET  /tracked/check           check a passphrase
 // Deploy: see "Fetch and track any stock on the hosted site" in the README.
+import { chartRequest } from '../src/lib/data/chartQuery.ts';
 import { isValidSymbol } from '../src/lib/data/symbols.ts';
 
 type KV = { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> };
@@ -75,20 +77,21 @@ export default {
 
     if (request.method !== 'GET') return reply('Method not allowed', 405);
 
-    // Only daily charts for well-formed tickers, so this can't be used as a general-purpose proxy.
+    // Only whitelisted charts for well-formed tickers, so this can't be used as a general-purpose proxy.
     const symbol = (url.searchParams.get('symbol') ?? '').toUpperCase();
     if (!isValidSymbol(symbol)) return reply('Invalid symbol', 400);
+    const chart = chartRequest(url.searchParams);
+    if (!chart) return reply('Invalid interval or range', 400);
 
-    const upstream = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=10y&interval=1d`,
-      { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } },
-    );
+    const upstream = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${chart.query}`, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    });
     return new Response(upstream.body, {
       status: upstream.status,
       headers: {
         ...cors,
         'Content-Type': 'application/json',
-        'Cache-Control': upstream.ok ? 'public, max-age=900' : 'no-store',
+        'Cache-Control': upstream.ok ? `public, max-age=${chart.maxAgeSeconds}` : 'no-store',
       },
     });
   },

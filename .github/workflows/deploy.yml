@@ -67,6 +67,11 @@ jobs:
       - name: Save today's prediction sheet
         run: npm run save-snapshot
 
+      # Intraday strategy backtest for the Day trading page. Also saves today's 5-minute bars next to the sheets.
+      - name: Intraday strategy research
+        run: npm run intraday-research
+        continue-on-error: true
+
       - name: Push the sheet to the predictions branch
         working-directory: snapshots
         run: |
