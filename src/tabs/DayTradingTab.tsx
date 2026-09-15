@@ -3,6 +3,7 @@ import { Card } from '../components/Card.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
 import { IntradayChart } from '../components/IntradayChart.tsx';
 import { PaperTrader } from '../components/PaperTrader.tsx';
+import { ScalpTest } from '../components/ScalpTest.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
 import { Toggle } from '../components/Toggle.tsx';
 import { useAsync, type AsyncState } from '../hooks/useAsync.ts';
@@ -39,6 +40,7 @@ export function DayTradingTab({ symbol, options, onSelectSymbol }: Props) {
   return (
     <div className="space-y-6">
       <StrategyLab symbol={symbol} options={stockOptions} onSelectSymbol={onSelectSymbol} />
+      <ScalpTest symbol={symbol} />
       <ResearchTable
         research={research}
         selected={symbol}

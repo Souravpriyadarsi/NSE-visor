@@ -9,7 +9,7 @@ export type Signal = { side: Side; stop: number };
 
 export type StrategyParams = Record<string, number>;
 
-export type StrategyId = 'orb' | 'vwap' | 'ema';
+export type StrategyId = 'orb' | 'vwap' | 'ema' | 'scalp';
 
 export type StrategyContext = { data: PreparedBars; i: number; params: StrategyParams; tradesToday: number };
 
@@ -23,7 +23,7 @@ export type Strategy = {
   /** Called at a bar's close when there's no open position. */
   entry: (ctx: StrategyContext) => Signal | null;
   /** Called at a bar's close with an open position; true exits at the next open. Stops, targets and the day's end are the simulator's job. */
-  exit?: (ctx: StrategyContext & { side: Side }) => boolean;
+  exit?: (ctx: StrategyContext & { side: Side; /** Bars since the entry filled. */ barsHeld: number }) => boolean;
 };
 
 /** Every combination of the given values. */
@@ -120,4 +120,38 @@ export const STRATEGIES: Strategy[] = [orb, vwap, emaCross];
 
 export const strategyById = (id: StrategyId) => STRATEGIES.find((s) => s.id === id)!;
 
-export const STRATEGY_SHORT_NAMES: Record<StrategyId, string> = { orb: 'Opening range', vwap: 'VWAP pullback', ema: 'MA crossover' };
+export const STRATEGY_SHORT_NAMES: Record<StrategyId, string> = {
+  orb: 'Opening range',
+  vwap: 'VWAP pullback',
+  ema: 'MA crossover',
+  scalp: '1-min scalp',
+};
+
+/**
+ * A fast scalp for 1-minute prices, kept apart from STRATEGIES (which trade 5-minute prices): trades a close beyond the
+ * last few minutes' range on the side of VWAP, aims for a gain as big as its stop, and gives up after a few minutes.
+ */
+export const SCALP: Strategy = {
+  id: 'scalp',
+  name: '1-minute breakout scalp',
+  description: "Trades a close above the last 5 minutes' high (or below their low) on the same side as VWAP, aims for a gain the size of its stop, and exits after 10 minutes either way.",
+  grid: grid({ lookback: [5], atrStop: [0.5, 1, 2], targetR: [1], maxHold: [10] }),
+  describe: (p) => `stop ${p.atrStop}× ATR, target the same distance, out after ${p.maxHold} min`,
+  entry({ data, i, params }) {
+    if (data.minute[i] < MARKET_OPEN_MINUTE + SETTLE_MINUTES) return null;
+    if (i - params.lookback < data.sessionStart[data.session[i]]) return null;
+    const atr = data.atr[i];
+    if (atr == null || atr <= 0) return null;
+    let high = -Infinity;
+    let low = Infinity;
+    for (let k = i - params.lookback; k < i; k++) {
+      high = Math.max(high, data.bars[k][2]);
+      low = Math.min(low, data.bars[k][3]);
+    }
+    const close = data.close[i];
+    if (close > high && close > data.vwap[i]) return { side: 1, stop: close - params.atrStop * atr };
+    if (close < low && close < data.vwap[i]) return { side: -1, stop: close + params.atrStop * atr };
+    return null;
+  },
+  exit: ({ barsHeld, params }) => barsHeld >= params.maxHold,
+};

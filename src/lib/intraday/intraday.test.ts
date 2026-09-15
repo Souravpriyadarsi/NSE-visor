@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { chartRequest } from '../data/chartQuery.ts';
-import { orderCharges } from '../tests/costs.ts';
+import { orderCharges, roundTripCharges } from '../tests/costs.ts';
 import { parseIntraday, WrongIntervalError, type IntradayBar, type IntradayHistory } from './bars.ts';
 import { walkForward } from './evaluate.ts';
 import { prepareBars } from './indicators.ts';
 import { DEFAULT_PAPER_STATE, paperDay } from './paper.ts';
 import { DEFAULT_RISK, positionSize, type RiskLimits } from './risk.ts';
 import { simulate, type ActiveWindow, type SimulationOptions } from './simulator.ts';
-import { strategyById } from './strategies.ts';
+import { SCALP, strategyById } from './strategies.ts';
 
 const OPEN = Date.UTC(2026, 2, 2, 3, 45) / 1000; // Monday 2 March 2026, 09:15 IST
 const STEP = 300;
@@ -205,5 +205,30 @@ describe('paperDay', () => {
     const restored = JSON.parse(JSON.stringify({ settings, windows })) as { settings: typeof settings; windows: ActiveWindow[] };
     expect(paperDay(history, '2026-03-02', restored.settings, restored.windows, true)!.result).toEqual(first);
     expect(first.open).not.toBeNull();
+  });
+});
+
+describe('1-minute scalp', () => {
+  it('takes a quick breakout and gives up after the holding limit', () => {
+    const bars: IntradayBar[] = [];
+    for (let i = 0; i < 80; i++) {
+      const [o, h, l, c] = i < 40 ? [100, 100.05, 99.95, 100] : i === 40 ? [100, 100.25, 99.95, 100.2] : [100.2, 100.25, 100.15, 100.2];
+      bars.push([OPEN + i * 60, o, h, l, c, 1000]);
+    }
+    const data = prepareBars({ symbol: 'TEST.NS', interval: '1m', sessions: [{ date: '2026-03-02', bars }] });
+    const { trades } = simulate(data, SCALP, { lookback: 5, atrStop: 1, targetR: 1, maxHold: 10 }, { ...RISK, maxTradesPerDay: 100 });
+    expect(trades).toHaveLength(1);
+    expect(trades[0].side).toBe(1);
+    expect(trades[0].entryTime).toBe(OPEN + 41 * 60);
+    expect(trades[0].reason).toBe('signal');
+    expect(trades[0].exitTime).toBe(OPEN + 52 * 60); // decided after 10 bars held, filled at the next open
+  });
+});
+
+describe('roundTripCharges', () => {
+  it("can't fall much below 0.04% for same-day trades, however large", () => {
+    expect(roundTripCharges(1_00_000, 'intraday')).toBeCloseTo(82.68, 2);
+    expect(roundTripCharges(10_00_000, 'intraday')).toBeCloseTo(402.01, 2);
+    expect(roundTripCharges(1_00_000, 'delivery')).toBeCloseTo(237.82, 2);
   });
 });

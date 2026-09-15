@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadIntraday, type IntradayRange } from '../lib/data/loadIntraday.ts';
-import { isMarketOpen, type IntradayHistory } from '../lib/intraday/bars.ts';
+import { isMarketOpen, type IntradayHistory, type IntradayInterval } from '../lib/intraday/bars.ts';
 
 export type IntradayState =
   | { status: 'loading' }
@@ -11,10 +11,15 @@ const LIVE_REFRESH_MS = 60_000;
 const CLOSED_REFRESH_MS = 5 * 60_000;
 
 /**
- * 5-minute bars for each stock. With `live`, reloads every minute while the market is open (every 5 minutes otherwise).
- * A failed reload keeps showing the last good prices.
+ * Intraday bars (5-minute by default) for each stock. With `live`, reloads every minute while the market is open
+ * (every 5 minutes otherwise). A failed reload keeps showing the last good prices.
  */
-export function useIntraday(symbols: string[], range: IntradayRange, live: boolean): Record<string, IntradayState> {
+export function useIntraday(
+  symbols: string[],
+  range: IntradayRange,
+  live: boolean,
+  interval: IntradayInterval = '5m',
+): Record<string, IntradayState> {
   const [states, setStates] = useState<Record<string, IntradayState>>({});
   const key = symbols.join(',');
 
@@ -25,9 +30,9 @@ export function useIntraday(symbols: string[], range: IntradayRange, live: boole
 
     async function refresh() {
       for (const symbol of list) {
-        const id = `${range}:${symbol}`;
+        const id = `${interval}:${range}:${symbol}`;
         try {
-          const history = await loadIntraday(symbol, range, controller.signal);
+          const history = await loadIntraday(symbol, range, controller.signal, interval);
           if (controller.signal.aborted) return;
           setStates((current) => ({ ...current, [id]: { status: 'ready', history, fetchedAt: Date.now() } }));
         } catch (err) {
@@ -46,7 +51,7 @@ export function useIntraday(symbols: string[], range: IntradayRange, live: boole
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [key, range, live]);
+  }, [key, range, live, interval]);
 
-  return Object.fromEntries(symbols.map((symbol) => [symbol, states[`${range}:${symbol}`] ?? { status: 'loading' }]));
+  return Object.fromEntries(symbols.map((symbol) => [symbol, states[`${interval}:${range}:${symbol}`] ?? { status: 'loading' }]));
 }

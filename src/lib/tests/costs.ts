@@ -29,3 +29,8 @@ export function orderCharges(value: number, side: 'buy' | 'sell', kind: TradeKin
   const dp = kind === 'delivery' && side === 'sell' ? c.dpChargePerSell : 0;
   return brokerage + stt + exchange + sebi + stamp + gst + dp;
 }
+
+/** Charges for buying and then selling `value` rupees of stock (ignores the small change in value in between). */
+export function roundTripCharges(value: number, kind: TradeKind): number {
+  return orderCharges(value, 'buy', kind) + orderCharges(value, 'sell', kind);
+}
