@@ -1,14 +1,16 @@
 import type { HistoryFile } from '../../types.ts';
 import { SUSPICIOUS_LOG_MOVE } from '../data/yahoo.ts';
-import { subtractMonths } from '../dates.ts';
+import { subtractDays, subtractMonths } from '../dates.ts';
 import { maxDrawdown } from '../stats.ts';
 import { orderCharges, type TradeKind } from './costs.ts';
 
 /** Number of shares bought and sold on every trade. */
 export const TEST_SHARES = [50, 100, 200] as const;
 
-export type PeriodKey = '1Y' | '3Y' | '5Y' | 'all';
-export const TEST_PERIODS: { key: PeriodKey; label: string; months: number | null }[] = [
+export type PeriodKey = '1W' | '1M' | '1Y' | '3Y' | '5Y' | 'all';
+export const TEST_PERIODS: { key: PeriodKey; label: string; months: number | null; days?: number }[] = [
+  { key: '1W', label: '1 week', months: null, days: 7 },
+  { key: '1M', label: '1 month', months: 1 },
   { key: '1Y', label: '1 year', months: 12 },
   { key: '3Y', label: '3 years', months: 36 },
   { key: '5Y', label: '5 years', months: 60 },
@@ -17,8 +19,9 @@ export const TEST_PERIODS: { key: PeriodKey; label: string; months: number | nul
 
 /** Start date for a preset period ending at lastDate; null means all history. */
 export function periodStart(period: PeriodKey, lastDate: string): string | null {
-  const months = TEST_PERIODS.find((p) => p.key === period)!.months;
-  return months == null ? null : subtractMonths(lastDate, months);
+  const preset = TEST_PERIODS.find((p) => p.key === period)!;
+  if (preset.days != null) return subtractDays(lastDate, preset.days);
+  return preset.months == null ? null : subtractMonths(lastDate, preset.months);
 }
 
 export type SeriesResult = {

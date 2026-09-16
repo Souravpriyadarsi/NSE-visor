@@ -101,6 +101,14 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
             onChange={setKind}
           />
         </div>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <Toggle
+            label="Period"
+            value={start.kind === 'preset' ? start.period : null}
+            choices={TEST_PERIODS.map((p) => ({ value: p.key, label: p.label }))}
+            onChange={(period) => update({ start: { kind: 'preset', period } })}
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <StockPicker options={stockOptions} onSelect={onSelectSymbol} placeholder="Pick a stock to test" />
           <Toggle
@@ -128,12 +136,6 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Toggle
-            label="Period"
-            value={start.kind === 'preset' ? start.period : null}
-            choices={TEST_PERIODS.map((p) => ({ value: p.key, label: p.label }))}
-            onChange={(period) => update({ start: { kind: 'preset', period } })}
-          />
           <label className="flex items-center gap-2 text-xs text-ink-400">
             Start date
             <input
