@@ -4,6 +4,7 @@ import type { IntradayResearch } from '../intraday/evaluate.ts';
 import type { PortfolioReport } from '../portfolio.ts';
 import type { LongHistoryFile, PriceSummary } from '../prices.ts';
 import type { ResearchReport, ResearchScores } from '../research/research.ts';
+import type { MarginMaximusSummary } from '../tests/marginMaximus.ts';
 import type { SameDaySummary } from '../tests/sameDay.ts';
 import type { StockListFile } from './stockList.ts';
 import { fileId } from './symbols.ts';
@@ -20,6 +21,7 @@ export const loadResearchReport = (signal?: AbortSignal) => getJson<ResearchRepo
 export const loadResearchScores = (signal?: AbortSignal) => getJson<ResearchScores>('research/scores.json', signal);
 export const loadIntradayResearch = (signal?: AbortSignal) => getJson<IntradayResearch>('research/intraday.json', signal);
 export const loadSameDaySummary =(signal?: AbortSignal) => getJson<SameDaySummary>('research/same-day.json', signal);
+export const loadMarginMaximusSummary = (signal?: AbortSignal) => getJson<MarginMaximusSummary>('research/margin-maximus.json', signal);
 export const loadPortfolios =(signal?: AbortSignal) => getJson<PortfolioReport>('tracker/portfolios.json', signal);
 export const loadStockList =(signal?: AbortSignal) => getJson<StockListFile>('data/nse-stocks.json', signal);
 export const loadManifest =(signal?: AbortSignal) => getJson<Manifest>('data/index.json', signal);

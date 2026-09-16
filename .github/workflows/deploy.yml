@@ -59,6 +59,11 @@ jobs:
         run: npm run same-day-test
         continue-on-error: true
 
+      # All-stocks table for the Tests page's Minimal Margin Maximus test.
+      - name: Minimal Margin Maximus test
+        run: npm run margin-maximus-test
+        continue-on-error: true
+
       - name: Load saved prediction sheets
         env:
           GH_TOKEN: ${{ github.token }}

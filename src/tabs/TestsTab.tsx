@@ -1,17 +1,20 @@
 import { useMemo, useRef, useState } from 'react';
 import { Card } from '../components/Card.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
+import { MarginMaximusAllStocks, MarginMaximusCard, MarginMaximusHow, type MmSettings } from '../components/MarginMaximusPanel.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
 import { Toggle } from '../components/Toggle.tsx';
 import { useAsync } from '../hooks/useAsync.ts';
 import { useHistories, type LoadedHistory } from '../hooks/useHistories.ts';
 import { useHistory, type HistoryState } from '../hooks/useHistory.ts';
+import { useLocalStorageState } from '../hooks/useLocalStorageState.ts';
 import { CHART_COLORS } from '../lib/chartTheme.ts';
 import { loadSameDaySummary } from '../lib/data/loadStatic.ts';
 import { displaySymbol } from '../lib/data/symbols.ts';
 import { exchangeClock, formatDate } from '../lib/dates.ts';
 import { formatPct, formatPrice } from '../lib/format.ts';
 import { CHARGES } from '../lib/tests/costs.ts';
+import { DEFAULT_TRAIL, TRAIL_RULES, type TrailKey } from '../lib/tests/marginMaximus.ts';
 import {
   periodStart,
   sameDayTest,
@@ -27,7 +30,9 @@ import type { HistoryFile, SymbolInfo } from '../types.ts';
 
 /** A preset period (ending at the latest close) or a start date picked by the user. */
 type Start = { kind: 'preset'; period: PeriodKey } | { kind: 'date'; date: string };
-type Settings = { shares: number; start: Start; withCosts: boolean };
+type Settings = { shares: number; start: Start; withCosts: boolean; trail: TrailKey };
+/** Which experiment the page is showing. The stock, share count, charges and period are shared by both. */
+type TestKind = 'same-day' | 'margin-maximus';
 type Props = { symbol: string; options: PickerOption[]; fetched: SymbolInfo[]; onSelectSymbol: (symbol: string) => void };
 
 /** Below this price, the bid-ask spread makes open/close trading results unreliable. */
@@ -51,8 +56,24 @@ const LINES = {
 };
 
 
+const TEST_TITLES: Record<TestKind, { title: string; subtitle: string }> = {
+  'same-day': {
+    title: 'Same-day trading test',
+    subtitle:
+      "What if you traded the same number of shares every single day? Buy at the close and sell at the next open, or buy at the open and sell at that day's close. Compared with simply holding the shares.",
+  },
+  'margin-maximus': {
+    title: 'Minimal Margin Maximus',
+    subtitle:
+      'What if you bought a few shares at every close and never used a stop-loss? Once the price is a rupee or two above what the shares cost, a trailing stop takes the profit; lots that never get there are simply held, so positions pile up when the price falls.',
+  },
+};
+
+const parseTestKind = (stored: unknown): TestKind | null => (stored === 'same-day' || stored === 'margin-maximus' ? stored : null);
+
 export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
-  const [settings, setSettings] = useState<Settings>({ shares: 100, start: { kind: 'preset', period: '1Y' }, withCosts: true });
+  const [kind, setKind] = useLocalStorageState<TestKind>('nse-predictor:test', 'same-day', parseTestKind);
+  const [settings, setSettings] = useState<Settings>({ shares: 100, start: { kind: 'preset', period: '1Y' }, withCosts: true, trail: DEFAULT_TRAIL });
   const stockOptions = useMemo(() => options.filter((o) => !o.symbol.startsWith('^')), [options]);
   const update = (change: Partial<Settings>) => setSettings((current) => ({ ...current, ...change }));
 
@@ -61,17 +82,29 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
   const history = state.status === 'ready' ? state.history : null;
   const from = startFor(settings.start, history?.lastDate ?? today);
   const { start } = settings;
+  const mmSettings = useMemo<MmSettings>(
+    () => ({ shares: settings.shares, withCosts: settings.withCosts, trail: settings.trail }),
+    [settings.shares, settings.withCosts, settings.trail],
+  );
 
   return (
     <div className="space-y-6">
-      <Card
-        title="Same-day trading test"
-        subtitle="What if you traded the same number of shares every single day? Buy at the close and sell at the next open, or buy at the open and sell at that day's close. Compared with simply holding the shares."
-      >
+      <Card title={TEST_TITLES[kind].title} subtitle={TEST_TITLES[kind].subtitle}>
+        <div className="mb-3">
+          <Toggle
+            label="Test"
+            value={kind}
+            choices={[
+              { value: 'same-day', label: 'Same-day trading' },
+              { value: 'margin-maximus', label: 'Minimal Margin Maximus' },
+            ]}
+            onChange={setKind}
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <StockPicker options={stockOptions} onSelect={onSelectSymbol} placeholder="Pick a stock to test" />
           <Toggle
-            label="Shares per trade"
+            label={kind === 'same-day' ? 'Shares per trade' : 'Shares per buy'}
             value={settings.shares}
             choices={TEST_SHARES.map((shares) => ({ value: shares, label: `${shares} shares` }))}
             onChange={(shares) => update({ shares })}
@@ -85,6 +118,14 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
             ]}
             onChange={(choice) => update({ withCosts: choice === 'with' })}
           />
+          {kind === 'margin-maximus' && (
+            <Toggle
+              label="Trigger and trailing stop"
+              value={settings.trail}
+              choices={TRAIL_RULES.map((rule) => ({ value: rule.key, label: rule.label }))}
+              onChange={(trail) => update({ trail })}
+            />
+          )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Toggle
@@ -111,11 +152,31 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
 
       {symbol.startsWith('^') ? (
         <p className="rounded-xl border border-ink-800 p-5 text-sm text-ink-400">Indices can't be bought directly. Pick a stock above.</p>
-      ) : (
+      ) : kind === 'same-day' ? (
         <StockTest symbol={symbol} state={state} retry={retry} settings={settings} from={from} />
+      ) : (
+        <MarginMaximusCard symbol={symbol} state={state} retry={retry} settings={mmSettings} from={from} />
       )}
-      <AllStocks settings={settings} fetched={fetched} selected={symbol} onSelect={onSelectSymbol} />
-      <ChargesCard />
+
+      {kind === 'same-day' ? (
+        <>
+          <AllStocks settings={settings} fetched={fetched} selected={symbol} onSelect={onSelectSymbol} />
+          <ChargesCard />
+        </>
+      ) : (
+        <>
+          <MarginMaximusAllStocks
+            settings={mmSettings}
+            period={start.kind === 'preset' ? start.period : null}
+            from={from}
+            startText={describeStart(start)}
+            fetched={fetched}
+            selected={symbol}
+            onSelect={onSelectSymbol}
+          />
+          <MarginMaximusHow trail={settings.trail} />
+        </>
+      )}
     </div>
   );
 }

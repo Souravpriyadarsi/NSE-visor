@@ -8,7 +8,7 @@ A lightweight web app for NSE (India) stocks, with these pages in the sidebar:
 - **Watchlist**: your starred stocks at a glance. Click one to open it in Analyze.
 - **Tracker**: every weekday evening the day's forecasts are saved. The Tracker shows each saved prediction next to the actual price once its month has passed, as a chart and as tables by stock or by day. Predictions still inside their month show as pending.
 - **Model report**: an honest, month-by-month backtest over the NIFTY 200 with the last 2 years sealed as a final test: how accurate the forecasts and ranges have been against simple baselines, and which stock-ranking signals (momentum, low volatility and others) have beaten the average stock after trading costs.
-- **Tests**: trading-rule experiments on real prices with typical Indian brokerage charges. The first is the **same-day trading test**: for any stock and any start date, 50, 100 or 200 shares traded every day either overnight (buy at the close, sell at the next open) or intraday (buy at the open, sell at the close), charted against simply holding the stock, plus an all-stocks table.
+- **Tests**: trading-rule experiments on real prices with typical Indian brokerage charges, for any stock and any start date, with an all-stocks table for each. The **same-day trading test** trades 50, 100 or 200 shares every day, either overnight (buy at the close, sell at the next open) or intraday (buy at the open, sell at the close), charted against simply holding the stock. **Minimal Margin Maximus** buys that many shares at every close and sells on a trailing stop (₹2 up, ₹1 back by default) — first for the whole holding once it is above its average buy price, otherwise lot by lot — with no stop-loss, so lots pile up in a fall. Daily prices don't say whether the high came before the low, so every result is a range from a worst case to a best case, with a 5-minute check over the last ~60 days to narrow it.
 - **Day trading**: intraday strategies (opening-range breakout, VWAP pullback, moving-average crossover) backtested on ~60 days of 5-minute prices after Zerodha intraday charges and slippage, with settings chosen on the first two-thirds of the days and judged on the rest. A **paper trader** then runs a strategy on live 5-minute prices with hard risk limits (risk per trade, daily loss limit, 15:15 square-off) and a kill switch, and keeps a track record. Live orders through Zerodha Kite Connect are a later step. With a free Angel One account, the local app also shows live **market depth** and uses Angel One's official prices (see below).
 - **Fetch any stock**: search all ~2,500 NSE stocks by company name or ticker, add them to your Dashboard, and choose which ones to **track daily**. The Analyze search covers every NSE stock too.
 
@@ -33,6 +33,7 @@ Open the URL Vite prints. `fetch-data` builds the Dashboard's data; Analyze and 
 | `npm run fetch-data -- TCS INFY` | Download only some stocks |
 | `npm run research` | Replay ~8 years of monthly forecasts and rankings into `public/research/` (after `fetch-data`, takes a few minutes) |
 | `npm run same-day-test` | Build the Tests page's all-stocks table into `public/research/same-day.json` (after `fetch-data`) |
+| `npm run margin-maximus-test` | Build the Minimal Margin Maximus all-stocks table into `public/research/margin-maximus.json` (after `fetch-data`) |
 | `npm run intraday-research` | Backtest the Day trading strategies for the NIFTY 50 on 5-minute prices into `public/research/intraday.json`, and keep finished days' bars in `snapshots/intraday/` |
 | `npm run intraday-research -- --source angel` | The same backtest on Angel One's ~100 days of 5-minute prices (needs `.env.local`) |
 | `npm run angel-tokens` | Save Angel One's NSE instrument tokens (public, no login) to `public/data/angel-tokens.json` |
@@ -127,6 +128,7 @@ scripts/
   build-tracker.ts        builds the Tracker's files
   research.ts             runs the research backtest
   same-day-test.ts        same-day trading test for every built-in stock
+  margin-maximus-test.ts  Minimal Margin Maximus test for every built-in stock
   intraday-research.ts    Day trading strategy backtest for the NIFTY 50
   angel/                  local Angel One service for the dev server: login, price stream, depth recorder
   angel-tokens.ts         Angel One NSE instrument tokens (runs in GitHub Actions)

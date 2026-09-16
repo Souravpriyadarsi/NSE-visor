@@ -15,6 +15,7 @@
     "build-tracker": "node scripts/build-tracker.ts",
     "research": "node scripts/research.ts",
     "same-day-test": "node scripts/same-day-test.ts",
+    "margin-maximus-test": "node scripts/margin-maximus-test.ts",
     "intraday-research": "node scripts/intraday-research.ts",
     "angel-tokens": "node scripts/angel-tokens.ts",
     "angel-history": "node scripts/angel-history.ts",
