@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Card } from './Card.tsx';
 import { GrowthChart, type GrowthLine } from './GrowthChart.tsx';
 import { usePriceSource } from '../hooks/useAngel.ts';
@@ -307,12 +307,24 @@ type AllStocksProps = {
   startText: string;
   /** The dates the table covers, shown as a badge. */
   rangeText: string;
+  /** The dates the "Before" column covers, or null when there is no earlier stretch to compare. */
+  beforeRange: string | null;
   fetched: SymbolInfo[];
   selected: string;
   onSelect: (symbol: string) => void;
 };
 
-export function MarginMaximusAllStocks({ settings, period, from, startText, rangeText, fetched, selected, onSelect }: AllStocksProps) {
+export function MarginMaximusAllStocks({
+  settings,
+  period,
+  from,
+  startText,
+  rangeText,
+  beforeRange,
+  fetched,
+  selected,
+  onSelect,
+}: AllStocksProps) {
   const summary = useAsync((signal) => loadMarginMaximusSummary(signal), []);
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'worst', descending: true });
   const [calculateAll, setCalculateAll] = useState(false);
@@ -386,7 +398,7 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, rang
   const worstBeatsHolding = complete.filter((r) => r.worst! > r.holding!).length;
   const bestBeatsHolding = complete.filter((r) => r.best! > r.holding!).length;
 
-  const header = (column: SortColumn, label: string, numeric = true, hint?: string) => (
+  const header = (column: SortColumn, label: ReactNode, numeric = true, hint?: string) => (
     <th className={`py-2 pr-3 font-medium whitespace-nowrap ${numeric ? 'text-right' : 'text-left'}`}>
       <button
         type="button"
@@ -459,7 +471,15 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, rang
               <tr className="text-xs text-ink-400">
                 {header('symbol', 'Stock', false)}
                 {header('peak', 'Peak capital', true, 'The most money tied up in held shares at once')}
-                {header('before', 'Before', true, 'How the price moved over the same length of time just before this period')}
+                {header(
+                  'before',
+                  <>
+                    <span className="block">Before</span>
+                    <span className="block text-[10px] font-normal text-ink-500">{beforeRange ?? 'no earlier prices'}</span>
+                  </>,
+                  true,
+                  'How the price moved over the same length of time just before this period',
+                )}
                 {header('holding', 'Holding', true, 'Buying the same number of shares once, on the first day')}
                 {header('worst', 'MMM worst', true, 'Sorts by rupees')}
                 {header('best', 'MMM best', true, 'Sorts by rupees')}

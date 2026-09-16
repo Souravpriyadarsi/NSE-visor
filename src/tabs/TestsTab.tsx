@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Card } from '../components/Card.tsx';
 import { DatePicker } from '../components/DatePicker.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
@@ -12,7 +12,7 @@ import { useLocalStorageState } from '../hooks/useLocalStorageState.ts';
 import { CHART_COLORS } from '../lib/chartTheme.ts';
 import { loadSameDaySummary } from '../lib/data/loadStatic.ts';
 import { displaySymbol } from '../lib/data/symbols.ts';
-import { exchangeClock, formatDate } from '../lib/dates.ts';
+import { daysBetween, exchangeClock, formatDate, subtractDays } from '../lib/dates.ts';
 import { formatPct, formatPrice } from '../lib/format.ts';
 import { CHARGES } from '../lib/tests/costs.ts';
 import { DEFAULT_TRAIL, TRAIL_RULES, type TrailKey } from '../lib/tests/marginMaximus.ts';
@@ -85,6 +85,8 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
   const lastDate = history?.lastDate ?? today;
   const from = startFor(settings.start, lastDate);
   const rangeText = from ? `${formatDate(from)} → ${formatDate(lastDate)}` : `All history to ${formatDate(lastDate)}`;
+  // The same length of time again, ending where the test starts: what the "Before" column measures.
+  const beforeRange = from ? `${formatDate(subtractDays(from, daysBetween(from, lastDate)))} → ${formatDate(from)}` : null;
   const { start } = settings;
   const mmSettings = useMemo<MmSettings>(
     () => ({ shares: settings.shares, withCosts: settings.withCosts, trail: settings.trail }),
@@ -165,7 +167,14 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
 
       {kind === 'same-day' ? (
         <>
-          <AllStocks settings={settings} rangeText={rangeText} fetched={fetched} selected={symbol} onSelect={onSelectSymbol} />
+          <AllStocks
+            settings={settings}
+            rangeText={rangeText}
+            beforeRange={beforeRange}
+            fetched={fetched}
+            selected={symbol}
+            onSelect={onSelectSymbol}
+          />
           <ChargesCard />
         </>
       ) : (
@@ -176,6 +185,7 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
             from={from}
             startText={describeStart(start)}
             rangeText={rangeText}
+            beforeRange={beforeRange}
             fetched={fetched}
             selected={symbol}
             onSelect={onSelectSymbol}
@@ -347,12 +357,14 @@ type AllStocksProps = {
   settings: Settings;
   /** The dates the table covers, shown as a badge. */
   rangeText: string;
+  /** The dates the "Before" column covers, or null when there is no earlier stretch to compare. */
+  beforeRange: string | null;
   fetched: SymbolInfo[];
   selected: string;
   onSelect: (symbol: string) => void;
 };
 
-function AllStocks({ settings, rangeText, fetched, selected, onSelect }: AllStocksProps) {
+function AllStocks({ settings, rangeText, beforeRange, fetched, selected, onSelect }: AllStocksProps) {
   const summary = useAsync((signal) => loadSameDaySummary(signal), []);
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'overnight', descending: true });
   const [calculateAll, setCalculateAll] = useState(false);
@@ -435,7 +447,7 @@ function AllStocks({ settings, rangeText, fetched, selected, onSelect }: AllStoc
   const overnightBeatsIntraday = complete.filter((r) => r.overnight! > r.intraday!).length;
   const beatsHolding = complete.filter((r) => Math.max(r.overnight!, r.intraday!) > r.holding!).length;
 
-  const header = (column: SortColumn, label: string, numeric = true, hint?: string) => (
+  const header = (column: SortColumn, label: ReactNode, numeric = true, hint?: string) => (
     <th className={`py-2 pr-3 font-medium whitespace-nowrap ${numeric ? 'text-right' : 'text-left'}`}>
       <button
         type="button"
@@ -508,7 +520,15 @@ function AllStocks({ settings, rangeText, fetched, selected, onSelect }: AllStoc
               <tr className="text-xs text-ink-400">
                 {header('symbol', 'Stock', false)}
                 {header('startValue', 'Starting value', true, "Shares × the first day's close")}
-                {header('before', 'Before', true, 'How the price moved over the same length of time just before this period')}
+                {header(
+                  'before',
+                  <>
+                    <span className="block">Before</span>
+                    <span className="block text-[10px] font-normal text-ink-500">{beforeRange ?? 'no earlier prices'}</span>
+                  </>,
+                  true,
+                  'How the price moved over the same length of time just before this period',
+                )}
                 {header('holding', 'Holding', true, 'Sorts by percentage')}
                 {header('overnight', 'Close → next open', true, 'Sorts by percentage')}
                 {header('intraday', 'Open → close', true, 'Sorts by percentage')}
