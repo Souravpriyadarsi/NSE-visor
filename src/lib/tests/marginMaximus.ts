@@ -327,7 +327,13 @@ export type MmSummaryRow = [
 
 export type MarginMaximusSummary = {
   generatedAt: string;
-  stocks: { symbol: string; name: string; results: Record<string, MmSummaryRow> }[];
+  stocks: {
+    symbol: string;
+    name: string;
+    results: Record<string, MmSummaryRow>;
+    /** Price change over the same length of time just before each period. */
+    before?: Partial<Record<PeriodKey, number>>;
+  }[];
 };
 
 export const marginMaximusKey = (shares: number, period: PeriodKey, trail: TrailKey) => `${shares}|${period}|${trail}`;

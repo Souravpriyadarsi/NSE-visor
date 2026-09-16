@@ -1,7 +1,15 @@
 // Same-day trading test for every built-in stock: each share count, with and without charges, over each period.
 // Writes public/research/same-day.json for the Tests page's all-stocks table. Run `npm run fetch-data` first.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { periodStart, sameDayTest, summaryKey, TEST_PERIODS, TEST_SHARES, type SameDaySummary } from '../src/lib/tests/sameDay.ts';
+import {
+  periodStart,
+  previousPeriodChange,
+  sameDayTest,
+  summaryKey,
+  TEST_PERIODS,
+  TEST_SHARES,
+  type SameDaySummary,
+} from '../src/lib/tests/sameDay.ts';
 import type { HistoryFile, Manifest } from '../src/types.ts';
 
 const DATA_DIR = new URL('../public/data/', import.meta.url);
@@ -30,7 +38,12 @@ for (const entry of manifest.symbols.filter((e) => !e.symbol.startsWith('^'))) {
       }
     }
   }
-  summary.stocks.push({ symbol: entry.symbol, name: entry.name, starts, results });
+  const before: SameDaySummary['stocks'][number]['before'] = {};
+  for (const period of TEST_PERIODS) {
+    const change = previousPeriodChange(history, periodStart(period.key, history.lastDate));
+    if (change != null) before[period.key] = round(change);
+  }
+  summary.stocks.push({ symbol: entry.symbol, name: entry.name, starts, before, results });
 }
 
 await mkdir(OUT_DIR, { recursive: true });

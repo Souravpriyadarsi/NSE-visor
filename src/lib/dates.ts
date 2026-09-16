@@ -93,3 +93,8 @@ export function calendarGrid(monthStart: string): string[] {
     return date;
   });
 }
+
+/** Whole days between two dates: daysBetween("2026-09-01", "2026-09-15") === 14. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((parseDate(to).getTime() - parseDate(from).getTime()) / 86_400_000);
+}

@@ -1,6 +1,6 @@
 import type { HistoryFile } from '../../types.ts';
 import { SUSPICIOUS_LOG_MOVE } from '../data/yahoo.ts';
-import { subtractDays, subtractMonths } from '../dates.ts';
+import { daysBetween, subtractDays, subtractMonths } from '../dates.ts';
 import { maxDrawdown } from '../stats.ts';
 import { orderCharges, type TradeKind } from './costs.ts';
 
@@ -22,6 +22,24 @@ export function periodStart(period: PeriodKey, lastDate: string): string | null 
   const preset = TEST_PERIODS.find((p) => p.key === period)!;
   if (preset.days != null) return subtractDays(lastDate, preset.days);
   return preset.months == null ? null : subtractMonths(lastDate, preset.months);
+}
+
+/**
+ * How the price moved over the same length of time just before a test's start date, so a run can be read next to
+ * what the stock was doing before it. Null when the history doesn't reach back that far, or for all-history tests.
+ */
+export function previousPeriodChange(history: HistoryFile, from: string | null, lastDate = history.lastDate): number | null {
+  if (!from) return null;
+  const length = daysBetween(from, lastDate);
+  if (length <= 0) return null;
+  const rows = history.rows.filter((row) => row[6] > 0 && row[4] > 0);
+  const closeOn = (date: string) => {
+    for (let i = rows.length - 1; i >= 0; i--) if (rows[i][0] <= date) return rows[i][4];
+    return null;
+  };
+  const before = closeOn(subtractDays(from, length));
+  const start = closeOn(from);
+  return before && start ? start / before - 1 : null;
 }
 
 export type SeriesResult = {
@@ -62,6 +80,8 @@ export type SameDaySummary = {
     name: string;
     /** Closing price on each period's first trading day; times the share count gives the starting value. */
     starts: Partial<Record<PeriodKey, number>>;
+    /** Price change over the same length of time just before each period. */
+    before?: Partial<Record<PeriodKey, number>>;
     results: Record<string, [holding: number, overnight: number, intraday: number]>;
   }[];
 };

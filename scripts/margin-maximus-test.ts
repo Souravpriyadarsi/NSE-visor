@@ -10,7 +10,7 @@ import {
   TRAIL_RULES,
   type MarginMaximusSummary,
 } from '../src/lib/tests/marginMaximus.ts';
-import { periodStart, TEST_PERIODS, TEST_SHARES } from '../src/lib/tests/sameDay.ts';
+import { periodStart, previousPeriodChange, TEST_PERIODS, TEST_SHARES } from '../src/lib/tests/sameDay.ts';
 import type { HistoryFile, Manifest } from '../src/types.ts';
 
 const DATA_DIR = new URL('../public/data/', import.meta.url);
@@ -47,7 +47,12 @@ for (const entry of manifest.symbols.filter((e) => !e.symbol.startsWith('^'))) {
       }
     }
   }
-  summary.stocks.push({ symbol: entry.symbol, name: entry.name, results });
+  const before: MarginMaximusSummary['stocks'][number]['before'] = {};
+  for (const period of TEST_PERIODS) {
+    const change = previousPeriodChange(history, periodStart(period.key, history.lastDate));
+    if (change != null) before[period.key] = Number(change.toFixed(4));
+  }
+  summary.stocks.push({ symbol: entry.symbol, name: entry.name, results, before });
 }
 
 await mkdir(OUT_DIR, { recursive: true });

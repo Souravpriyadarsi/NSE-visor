@@ -24,7 +24,7 @@ import {
   type MmRun,
   type TrailKey,
 } from '../lib/tests/marginMaximus.ts';
-import type { PeriodKey } from '../lib/tests/sameDay.ts';
+import { previousPeriodChange, type PeriodKey } from '../lib/tests/sameDay.ts';
 import type { HistoryFile, SymbolInfo } from '../types.ts';
 
 /** The settings this test shares with the same-day one, plus its own trigger and trail. */
@@ -273,8 +273,16 @@ function FiveMinuteCheck({ symbol, history, settings }: { symbol: string; histor
   );
 }
 
-type SummaryRow = SymbolInfo & { peak: number | null; holding: number | null; worst: number | null; best: number | null; note: string | null };
-type SortColumn = 'symbol' | 'peak' | 'holding' | 'worst' | 'best';
+type SummaryRow = SymbolInfo & {
+  peak: number | null;
+  /** Price change over the same length of time just before the period. */
+  before: number | null;
+  holding: number | null;
+  worst: number | null;
+  best: number | null;
+  note: string | null;
+};
+type SortColumn = 'symbol' | 'peak' | 'before' | 'holding' | 'worst' | 'best';
 
 function MoneyCell({ value, peak }: { value: number | null; peak: number | null }) {
   return (
@@ -297,12 +305,14 @@ type AllStocksProps = {
   period: PeriodKey | null;
   from: string | null;
   startText: string;
+  /** The dates the table covers, shown as a badge. */
+  rangeText: string;
   fetched: SymbolInfo[];
   selected: string;
   onSelect: (symbol: string) => void;
 };
 
-export function MarginMaximusAllStocks({ settings, period, from, startText, fetched, selected, onSelect }: AllStocksProps) {
+export function MarginMaximusAllStocks({ settings, period, from, startText, rangeText, fetched, selected, onSelect }: AllStocksProps) {
   const summary = useAsync((signal) => loadMarginMaximusSummary(signal), []);
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'worst', descending: true });
   const [calculateAll, setCalculateAll] = useState(false);
@@ -326,12 +336,13 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, fetc
   const calculatedRow = (stock: SymbolInfo, loaded: LoadedHistory | undefined): SummaryRow => {
     if (loaded?.status !== 'ready') {
       const note = loaded?.status === 'error' ? loaded.message : 'Loading…';
-      return { ...stock, peak: null, holding: null, worst: null, best: null, note };
+      return { ...stock, peak: null, before: null, holding: null, worst: null, best: null, note };
     }
     const r = testOf(stock.symbol, loaded.history);
     return {
       ...stock,
       peak: r ? Math.max(r.best.peakCapital, r.worst.peakCapital) : null,
+      before: previousPeriodChange(loaded.history, from),
       holding: r ? r.holding[r.holding.length - 1] : null,
       worst: r?.worst.profit ?? null,
       best: r?.best.profit ?? null,
@@ -345,7 +356,16 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, fetc
     for (const s of builtIn) {
       const row = s.results[key];
       const [worst, best] = row ? summaryRange(row, withCosts) : [null, null];
-      list.push({ symbol: s.symbol, name: s.name, peak: row?.[0] ?? null, holding: row?.[1] ?? null, worst, best, note: null });
+      list.push({
+        symbol: s.symbol,
+        name: s.name,
+        peak: row?.[0] ?? null,
+        before: s.before?.[period] ?? null,
+        holding: row?.[1] ?? null,
+        worst,
+        best,
+        note: null,
+      });
     }
   } else if (calculateAll) {
     for (const s of builtIn) list.push(calculatedRow({ symbol: s.symbol, name: s.name }, histories[s.symbol]));
@@ -416,12 +436,17 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, fetc
         </p>
       )}
 
-      {complete.length > 0 && (
-        <p className="mb-3 text-sm text-ink-300">
-          Beat simply holding for <strong>{worstBeatsHolding}</strong> of {complete.length} stocks even in the worst case, and{' '}
-          <strong>{bestBeatsHolding}</strong> in the best case.
-        </p>
-      )}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {complete.length > 0 ? (
+          <p className="text-sm text-ink-300">
+            Beat simply holding for <strong>{worstBeatsHolding}</strong> of {complete.length} stocks even in the worst case, and{' '}
+            <strong>{bestBeatsHolding}</strong> in the best case.
+          </p>
+        ) : (
+          <span />
+        )}
+        <span className="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-0.5 text-[11px] whitespace-nowrap text-ink-300">{rangeText}</span>
+      </div>
 
       {summary.status === 'loading' ? (
         <div className="h-48 animate-pulse rounded-lg bg-ink-800/40" />
@@ -434,6 +459,7 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, fetc
               <tr className="text-xs text-ink-400">
                 {header('symbol', 'Stock', false)}
                 {header('peak', 'Peak capital', true, 'The most money tied up in held shares at once')}
+                {header('before', 'Before', true, 'How the price moved over the same length of time just before this period')}
                 {header('holding', 'Holding', true, 'Buying the same number of shares once, on the first day')}
                 {header('worst', 'MMM worst', true, 'Sorts by rupees')}
                 {header('best', 'MMM best', true, 'Sorts by rupees')}
@@ -455,6 +481,7 @@ export function MarginMaximusAllStocks({ settings, period, from, startText, fetc
                     <span className="block max-w-56 truncate text-xs text-ink-400">{r.note ?? r.name}</span>
                   </td>
                   <td className="py-2 pr-3 text-right tabular-nums text-ink-300">{r.peak == null ? '—' : rupees(r.peak)}</td>
+                  <td className={`py-2 pr-3 text-right tabular-nums ${tone(r.before)}`}>{r.before == null ? '—' : signedPct(r.before)}</td>
                   <MoneyCell value={r.holding} peak={r.peak} />
                   <MoneyCell value={r.worst} peak={r.peak} />
                   <MoneyCell value={r.best} peak={r.peak} />

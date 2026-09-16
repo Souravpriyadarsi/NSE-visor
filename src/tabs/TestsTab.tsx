@@ -18,6 +18,7 @@ import { CHARGES } from '../lib/tests/costs.ts';
 import { DEFAULT_TRAIL, TRAIL_RULES, type TrailKey } from '../lib/tests/marginMaximus.ts';
 import {
   periodStart,
+  previousPeriodChange,
   sameDayTest,
   summaryKey,
   TEST_PERIODS,
@@ -81,7 +82,9 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
   const { state, retry } = useHistory(symbol);
   const today = exchangeClock(new Date()).date;
   const history = state.status === 'ready' ? state.history : null;
-  const from = startFor(settings.start, history?.lastDate ?? today);
+  const lastDate = history?.lastDate ?? today;
+  const from = startFor(settings.start, lastDate);
+  const rangeText = from ? `${formatDate(from)} → ${formatDate(lastDate)}` : `All history to ${formatDate(lastDate)}`;
   const { start } = settings;
   const mmSettings = useMemo<MmSettings>(
     () => ({ shares: settings.shares, withCosts: settings.withCosts, trail: settings.trail }),
@@ -162,7 +165,7 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
 
       {kind === 'same-day' ? (
         <>
-          <AllStocks settings={settings} fetched={fetched} selected={symbol} onSelect={onSelectSymbol} />
+          <AllStocks settings={settings} rangeText={rangeText} fetched={fetched} selected={symbol} onSelect={onSelectSymbol} />
           <ChargesCard />
         </>
       ) : (
@@ -172,6 +175,7 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
             period={start.kind === 'preset' ? start.period : null}
             from={from}
             startText={describeStart(start)}
+            rangeText={rangeText}
             fetched={fetched}
             selected={symbol}
             onSelect={onSelectSymbol}
@@ -316,12 +320,14 @@ function StockTest({ symbol, state, retry, settings, from }: StockTestProps) {
 /** Returns are fractions of the starting value (shares × first day's close). */
 type SummaryRow = SymbolInfo & {
   startValue: number | null;
+  /** Price change over the same length of time just before the period. */
+  before: number | null;
   holding: number | null;
   overnight: number | null;
   intraday: number | null;
   note: string | null;
 };
-type SortColumn = 'symbol' | 'startValue' | 'holding' | 'overnight' | 'intraday';
+type SortColumn = 'symbol' | 'startValue' | 'before' | 'holding' | 'overnight' | 'intraday';
 
 function ProfitCell({ fraction, startValue }: { fraction: number | null; startValue: number | null }) {
   return (
@@ -337,9 +343,16 @@ function ProfitCell({ fraction, startValue }: { fraction: number | null; startVa
     </td>
   );
 }
-type AllStocksProps = { settings: Settings; fetched: SymbolInfo[]; selected: string; onSelect: (symbol: string) => void };
+type AllStocksProps = {
+  settings: Settings;
+  /** The dates the table covers, shown as a badge. */
+  rangeText: string;
+  fetched: SymbolInfo[];
+  selected: string;
+  onSelect: (symbol: string) => void;
+};
 
-function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
+function AllStocks({ settings, rangeText, fetched, selected, onSelect }: AllStocksProps) {
   const summary = useAsync((signal) => loadSameDaySummary(signal), []);
   const [sort, setSort] = useState<{ column: SortColumn; descending: boolean }>({ column: 'overnight', descending: true });
   const [calculateAll, setCalculateAll] = useState(false);
@@ -366,6 +379,7 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
       return {
         ...stock,
         startValue: null,
+        before: null,
         holding: null,
         overnight: null,
         intraday: null,
@@ -376,6 +390,7 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
     return {
       ...stock,
       startValue: r?.startValue ?? null,
+      before: previousPeriodChange(loaded.history, startFor(start, loaded.history.lastDate)),
       holding: r?.stock.totalReturn ?? null,
       overnight: r?.overnight.totalReturn ?? null,
       intraday: r?.intraday.totalReturn ?? null,
@@ -393,6 +408,7 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
         symbol: s.symbol,
         name: s.name,
         startValue: startClose == null ? null : shares * startClose,
+        before: s.before?.[start.period] ?? null,
         holding: r?.[0] ?? null,
         overnight: r?.[1] ?? null,
         intraday: r?.[2] ?? null,
@@ -469,12 +485,17 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
         </p>
       )}
 
-      {complete.length > 0 && (
-        <p className="mb-3 text-sm text-ink-300">
-          Overnight beat intraday for <strong>{overnightBeatsIntraday}</strong> of {complete.length} stocks. A same-day rule beat simply
-          holding for <strong>{beatsHolding}</strong>.
-        </p>
-      )}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {complete.length > 0 ? (
+          <p className="text-sm text-ink-300">
+            Overnight beat intraday for <strong>{overnightBeatsIntraday}</strong> of {complete.length} stocks. A same-day rule beat simply holding
+            for <strong>{beatsHolding}</strong>.
+          </p>
+        ) : (
+          <span />
+        )}
+        <span className="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-0.5 text-[11px] whitespace-nowrap text-ink-300">{rangeText}</span>
+      </div>
 
       {summary.status === 'loading' ? (
         <div className="h-48 animate-pulse rounded-lg bg-ink-800/40" />
@@ -487,6 +508,7 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
               <tr className="text-xs text-ink-400">
                 {header('symbol', 'Stock', false)}
                 {header('startValue', 'Starting value', true, "Shares × the first day's close")}
+                {header('before', 'Before', true, 'How the price moved over the same length of time just before this period')}
                 {header('holding', 'Holding', true, 'Sorts by percentage')}
                 {header('overnight', 'Close → next open', true, 'Sorts by percentage')}
                 {header('intraday', 'Open → close', true, 'Sorts by percentage')}
@@ -508,6 +530,7 @@ function AllStocks({ settings, fetched, selected, onSelect }: AllStocksProps) {
                     <span className="block max-w-56 truncate text-xs text-ink-400">{r.note ?? r.name}</span>
                   </td>
                   <td className="py-2 pr-3 text-right tabular-nums text-ink-300">{r.startValue == null ? '—' : rupees(r.startValue)}</td>
+                  <td className={`py-2 pr-3 text-right tabular-nums ${tone(r.before)}`}>{r.before == null ? '—' : signedPct(r.before)}</td>
                   {[r.holding, r.overnight, r.intraday].map((fraction, n) => (
                     <ProfitCell key={n} fraction={fraction} startValue={r.startValue} />
                   ))}
