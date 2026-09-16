@@ -170,7 +170,7 @@ Without this, the hosted Fetch page explains that live fetching isn't set up; ev
    ```
 
    Paste the `id` it prints into `worker/wrangler.jsonc` in place of `PASTE-KV-NAMESPACE-ID-HERE`.
-4. Choose a passphrase for **Track daily** (the app asks for it once per browser):
+4. Choose a passphrase. The hosted site asks for it before opening (once per browser), and it also unlocks **Track daily**:
 
    ```bash
    npx wrangler secret put TRACK_PASSPHRASE
@@ -187,6 +187,8 @@ Without this, the hosted Fetch page explains that live fetching isn't set up; ev
 7. Re-run the workflow from the **Actions** tab.
 
 The Worker only relays daily price charts for valid tickers, and changing the tracked list requires the passphrase. The free plan allows 100,000 requests a day.
+
+The password screen hides the app from visitors, but GitHub Pages can't protect files: the price data and research JSON can still be downloaded by anyone who knows their addresses, and the repository itself is public. The screen isn't shown when running locally with `npm run dev`.
 
 ## Limitations
 
