@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Card } from '../components/Card.tsx';
+import { DatePicker } from '../components/DatePicker.tsx';
 import { GrowthChart, type GrowthLine } from '../components/GrowthChart.tsx';
 import { MarginMaximusAllStocks, MarginMaximusCard, MarginMaximusHow, type MmSettings } from '../components/MarginMaximusPanel.tsx';
 import { StockPicker, type PickerOption } from '../components/StockPicker.tsx';
@@ -136,18 +137,17 @@ export function TestsTab({ symbol, options, fetched, onSelectSymbol }: Props) {
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-ink-400">
+          <span className="flex items-center gap-2 text-xs text-ink-400">
             Start date
-            <input
-              type="date"
+            <DatePicker
+              label="Start date"
               value={from ?? history?.rows[0]?.[0] ?? ''}
+              min={history?.rows[0]?.[0]}
               max={history?.lastDate ?? today}
-              onChange={(e) => e.target.value && update({ start: { kind: 'date', date: e.target.value } })}
-              className={`rounded-lg border bg-ink-900 px-2 py-1 text-sm text-ink-100 focus:border-accent-500 focus:outline-none ${
-                start.kind === 'date' ? 'border-accent-500/60' : 'border-ink-700'
-              }`}
+              active={start.kind === 'date'}
+              onChange={(date) => update({ start: { kind: 'date', date } })}
             />
-          </label>
+          </span>
           <span className="text-xs text-ink-500">Pick a period, or any start date. Tests run to the latest close.</span>
         </div>
       </Card>

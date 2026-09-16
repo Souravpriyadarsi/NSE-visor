@@ -70,3 +70,26 @@ export function subtractDays(date: string, days: number): string {
   d.setUTCDate(d.getUTCDate() - days);
   return toIsoDate(d);
 }
+
+/** First day of a date's month: "2026-09-15" -> "2026-09-01". */
+export function startOfMonth(date: string): string {
+  return date ? `${date.slice(0, 7)}-01` : toIsoDate(new Date());
+}
+
+/** Moves to another month, keeping day 1: addMonths("2026-09-01", -1) -> "2026-08-01". */
+export function addMonths(date: string, months: number): string {
+  const d = parseDate(startOfMonth(date));
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return toIsoDate(d);
+}
+
+/** The 42 days a calendar shows for a month: six Monday-to-Sunday weeks, including days either side. */
+export function calendarGrid(monthStart: string): string[] {
+  const cursor = parseDate(startOfMonth(monthStart));
+  cursor.setUTCDate(cursor.getUTCDate() - ((cursor.getUTCDay() + 6) % 7));
+  return Array.from({ length: 42 }, () => {
+    const date = toIsoDate(cursor);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    return date;
+  });
+}

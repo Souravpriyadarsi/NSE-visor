@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exchangeClock, nextTradingDays, subtractMonths, toExchangeDate } from './dates.ts';
+import { addMonths, calendarGrid, exchangeClock, nextTradingDays, startOfMonth, subtractMonths, toExchangeDate } from './dates.ts';
 
 describe('dates', () => {
   it('skips weekends when listing future trading days', () => {
@@ -18,5 +18,22 @@ describe('dates', () => {
 
   it('subtracts months', () => {
     expect(subtractMonths('2026-09-14', 12)).toBe('2025-09-14');
+  });
+});
+
+describe('calendar', () => {
+  it('starts each month grid on a Monday and covers six weeks', () => {
+    const grid = calendarGrid('2025-09-15');
+    expect(grid).toHaveLength(42);
+    expect(grid[0]).toBe('2025-09-01'); // 1 September 2025 was a Monday
+    expect(grid[41]).toBe('2025-10-12');
+    // October 2025 starts on a Wednesday, so the grid opens with two September days.
+    expect(calendarGrid('2025-10-01').slice(0, 3)).toEqual(['2025-09-29', '2025-09-30', '2025-10-01']);
+  });
+
+  it('moves between months', () => {
+    expect(startOfMonth('2026-09-15')).toBe('2026-09-01');
+    expect(addMonths('2026-01-31', -1)).toBe('2025-12-01');
+    expect(addMonths('2026-12-01', 1)).toBe('2027-01-01');
   });
 });
