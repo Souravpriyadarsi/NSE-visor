@@ -1,6 +1,6 @@
 import { isValidSymbol, normalizeSymbol } from './data/symbols.ts';
 
-export const TABS = ['dashboard', 'prices', 'analyze', 'watchlist', 'tracker', 'report', 'tests', 'daytrading', 'fetch'] as const;
+export const TABS = ['dashboard', 'prices', 'analyze', 'watchlist', 'tracker', 'report', 'tests', 'daytrading', 'algo', 'fetch'] as const;
 export type Tab = (typeof TABS)[number];
 export type UrlState = { tab: Tab; symbol: string };
 

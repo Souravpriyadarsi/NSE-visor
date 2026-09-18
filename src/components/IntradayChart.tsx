@@ -26,7 +26,14 @@ type Props = {
   trades: Trade[];
   open?: OpenPosition | null;
   format: (value: number) => string;
+  /** Other orders to mark, e.g. the Algo trading bot's buys and sells. */
+  marks?: ChartMark[];
+  /** Other price levels to draw, e.g. a trailing stop. */
+  levels?: ChartLevel[];
 };
+
+export type ChartMark = { time: number; side: 'buy' | 'sell'; text: string };
+export type ChartLevel = { price: number; title: string; tone: 'rise' | 'fall' | 'guide' };
 
 type Parts = {
   chart: IChartApi;
@@ -48,7 +55,7 @@ function entryMarker(side: Side, time: number, qty: number): SeriesMarker<Time> 
 }
 
 /** One trading day of 5-minute candles with VWAP, entries (arrows) and exits (circles). */
-export function IntradayChart({ bars, vwap, trades, open = null, format }: Props) {
+export function IntradayChart({ bars, vwap, trades, open = null, format, marks, levels }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const partsRef = useRef<Parts | null>(null);
 
@@ -104,6 +111,13 @@ export function IntradayChart({ bars, vwap, trades, open = null, format }: Props
       });
     }
     if (open) markers.push(entryMarker(open.side, open.entryTime, open.qty));
+    for (const mark of marks ?? []) {
+      markers.push(
+        mark.side === 'buy'
+          ? { time: chartTime(Math.floor((mark.time - 1) / 300) * 300), position: 'belowBar', shape: 'arrowUp', color: CHART_COLORS.rise, text: mark.text }
+          : { time: chartTime(Math.floor((mark.time - 1) / 300) * 300), position: 'aboveBar', shape: 'arrowDown', color: CHART_COLORS.fall, text: mark.text },
+      );
+    }
     parts.markers.setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
 
     for (const line of parts.lines) parts.candles.removePriceLine(line);
@@ -115,8 +129,14 @@ export function IntradayChart({ bars, vwap, trades, open = null, format }: Props
       line(open.stop, CHART_COLORS.fall, 'stop');
       if (open.target != null) line(open.target, CHART_COLORS.rise, 'target');
     }
+    for (const level of levels ?? []) {
+      const color = level.tone === 'rise' ? CHART_COLORS.rise : level.tone === 'fall' ? CHART_COLORS.fall : CHART_COLORS.guide;
+      parts.lines.push(
+        parts.candles.createPriceLine({ price: level.price, color, title: level.title, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true }),
+      );
+    }
     parts.chart.timeScale().fitContent();
-  }, [bars, vwap, trades, open, format]);
+  }, [bars, vwap, trades, open, format, marks, levels]);
 
   return <div ref={containerRef} className="h-[320px] w-full" />;
 }

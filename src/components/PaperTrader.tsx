@@ -6,6 +6,7 @@ import { Toggle } from './Toggle.tsx';
 import { usePriceSource } from '../hooks/useAngel.ts';
 import { useIntraday } from '../hooks/useIntraday.ts';
 import { useLocalStorageState } from '../hooks/useLocalStorageState.ts';
+import { useNow } from '../hooks/useNow.ts';
 import { displaySymbol } from '../lib/data/symbols.ts';
 import { formatDate } from '../lib/dates.ts';
 import { formatPct, formatPrice } from '../lib/format.ts';
@@ -34,15 +35,6 @@ const rupees = (value: number) => `${value < 0 ? '-' : ''}₹${Math.abs(value).t
 const signedRupees = (value: number) => (value > 0 ? `+${rupees(value)}` : rupees(value));
 const tone = (value: number) => (value > 0 ? 'text-emerald-400' : value < 0 ? 'text-rose-400' : '');
 const nowSecondsOf = () => Math.floor(Date.now() / 1000);
-
-function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
-    return () => window.clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
 
 export function PaperTrader({ options, research }: Props) {
   const [state, setState] = useLocalStorageState<PaperState>('nse-visor:paper-trader', DEFAULT_PAPER_STATE, parsePaperState);

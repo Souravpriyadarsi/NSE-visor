@@ -79,10 +79,8 @@ export type MmDay = {
   heldCost: number;
 };
 
-type OpenLot = { buyPrice: number; day: number; trail: Trail };
-
 /** Keeps the waiting lots cheapest first, so the ones reaching their trigger are always at the front. */
-function insertLot(lots: OpenLot[], lot: OpenLot) {
+export function insertLot<T extends { buyPrice: number }>(lots: T[], lot: T) {
   let low = 0;
   let high = lots.length;
   while (low < high) {
@@ -105,76 +103,123 @@ function insertLot(lots: OpenLot[], lot: OpenLot) {
  *     bought at the close after that day's selling, so positions pile up while the price falls.
  */
 export function planTrades(sessions: MmSession[], rules: StopRules, worst: boolean): MmDay[] {
-  const waiting: OpenLot[] = []; // not armed yet, cheapest buy price first
-  let armed: OpenLot[] = []; // stops already armed, which only outlive a bar in the 5-minute check
+  let held: { buyPrice: number; day: number }[] = [];
   let costSum = 0; // what one share of every held lot cost, added up
   const days: MmDay[] = [];
 
-  for (let d = 0; d < sessions.length; d++) {
-    const { date, bars } = sessions[d];
-    const sells: MmSell[] = [];
-    let wholeTrail: Trail = null;
+  sessions.forEach(({ date, bars }, d) => {
+    if (bars.length === 0) return;
+    const session = tradeSession(held, bars, rules, worst, { costSum });
+    held = session.held;
+    costSum = session.costSum;
+    const sells = session.sells.map((s) => ({ buyPrice: s.lot.buyPrice, sellPrice: s.price, heldDays: d - s.lot.day }));
+    // 4. Buy the day's lot at the close, after the day's selling.
+    const close = bars[bars.length - 1].close;
+    insertLot(held, { buyPrice: close, day: d });
+    costSum += close;
+    days.push({ date, close, sells, buyPrice: close, heldLots: held.length, heldCost: costSum });
+  });
+  return days;
+}
 
-    const sell = (lot: OpenLot, price: number) => {
-      sells.push({ buyPrice: lot.buyPrice, sellPrice: price, heldDays: d - lot.day });
-      costSum -= lot.buyPrice;
-    };
-    const sellEverything = (price: number) => {
-      for (const lot of armed) sell(lot, price);
-      for (const lot of waiting) sell(lot, price);
-      armed = [];
-      waiting.length = 0;
-      wholeTrail = null;
-    };
+/** One lot sold during a session, and the bar it sold in. */
+export type SessionSell<T> = { lot: T; price: number; bar: number; reason: 'whole' | 'lot' | 'close' };
 
-    for (let b = 0; b < bars.length; b++) {
-      const bar = bars[b];
-      const held = waiting.length + armed.length;
+export type SessionResult<T> = {
+  sells: SessionSell<T>[];
+  /** Lots still held after the bars, cheapest first (including armed ones when the day isn't over). */
+  held: T[];
+  costSum: number;
+  /** While the day is still trading: stops armed so far, with the highest price since each armed. */
+  armed: { lot: T; trail: number }[];
+  /** While the day is still trading: the whole holding's trailing high, or null when it hasn't armed. */
+  wholeTrail: Trail;
+};
 
-      if (held > 0) {
-        // 1. The whole holding first.
-        const whole = stepBar(bar, costSum / held, wholeTrail, rules, worst);
-        wholeTrail = whole.trail;
-        if (whole.exit != null) sellEverything(whole.exit);
-        else if (wholeTrail == null) {
-          // 2. Lot by lot. Stops armed in an earlier bar first, then lots reaching their own trigger now.
-          if (armed.length > 0) {
-            const staying: OpenLot[] = [];
-            for (const lot of armed) {
-              const step = stepBar(bar, lot.buyPrice, lot.trail, rules, worst);
-              if (step.exit == null) {
-                lot.trail = step.trail;
-                staying.push(lot);
-              } else sell(lot, step.exit);
-            }
-            armed = staying;
-          }
-          let arming = 0;
-          while (arming < waiting.length && waiting[arming].buyPrice + rules.trigger <= bar.high) arming++;
-          for (const lot of waiting.splice(0, arming)) {
-            const step = stepBar(bar, lot.buyPrice, null, rules, worst);
+/**
+ * Steps 1–3 of Minimal Margin Maximus over one day's bars, for the lots held since earlier closes (cheapest first).
+ * With `closeDay`, the bars are the whole day and anything still armed sells at the last close; without it, the day
+ * is still trading and armed stops stay open. Buying the day's lot is left to the caller.
+ */
+export function tradeSession<T extends { buyPrice: number }>(
+  lots: T[],
+  bars: MmBar[],
+  rules: StopRules,
+  worst: boolean,
+  { closeDay = true, costSum: startCost }: { closeDay?: boolean; costSum?: number } = {},
+): SessionResult<T> {
+  type Open = { lot: T; trail: Trail };
+  let waiting: Open[] = lots.map((lot) => ({ lot, trail: null })); // not armed yet, cheapest buy price first
+  let armed: Open[] = []; // stops already armed, which only outlive a bar on 5-minute prices
+  let costSum = startCost ?? lots.reduce((sum, lot) => sum + lot.buyPrice, 0);
+  let wholeTrail: Trail = null;
+  const sells: SessionSell<T>[] = [];
+
+  const sell = (open: Open, price: number, bar: number, reason: SessionSell<T>['reason']) => {
+    sells.push({ lot: open.lot, price, bar, reason });
+    costSum -= open.lot.buyPrice;
+  };
+  const sellEverything = (price: number, bar: number, reason: SessionSell<T>['reason']) => {
+    for (const open of armed) sell(open, price, bar, reason);
+    for (const open of waiting) sell(open, price, bar, reason);
+    armed = [];
+    waiting = [];
+    wholeTrail = null;
+  };
+
+  for (let b = 0; b < bars.length; b++) {
+    const bar = bars[b];
+    const held = waiting.length + armed.length;
+
+    if (held > 0) {
+      // 1. The whole holding first.
+      const whole = stepBar(bar, costSum / held, wholeTrail, rules, worst);
+      wholeTrail = whole.trail;
+      if (whole.exit != null) sellEverything(whole.exit, b, 'whole');
+      else if (wholeTrail == null) {
+        // 2. Lot by lot. Stops armed in an earlier bar first, then lots reaching their own trigger now.
+        if (armed.length > 0) {
+          const staying: Open[] = [];
+          for (const open of armed) {
+            const step = stepBar(bar, open.lot.buyPrice, open.trail, rules, worst);
             if (step.exit == null) {
-              lot.trail = step.trail;
-              armed.push(lot);
-            } else sell(lot, step.exit);
+              open.trail = step.trail;
+              staying.push(open);
+            } else sell(open, step.exit, b, 'lot');
           }
+          armed = staying;
         }
-      }
-
-      if (b === bars.length - 1) {
-        // 3. Sell whatever is still armed at the close, then 4. buy the day's lot.
-        if (wholeTrail != null && waiting.length + armed.length > 0) sellEverything(bar.close);
-        else if (armed.length > 0) {
-          for (const lot of armed) sell(lot, bar.close);
-          armed = [];
+        let arming = 0;
+        while (arming < waiting.length && waiting[arming].lot.buyPrice + rules.trigger <= bar.high) arming++;
+        for (const open of waiting.splice(0, arming)) {
+          const step = stepBar(bar, open.lot.buyPrice, null, rules, worst);
+          if (step.exit == null) {
+            open.trail = step.trail;
+            armed.push(open);
+          } else sell(open, step.exit, b, 'lot');
         }
-        insertLot(waiting, { buyPrice: bar.close, day: d, trail: null });
-        costSum += bar.close;
-        days.push({ date, close: bar.close, sells, buyPrice: bar.close, heldLots: waiting.length, heldCost: costSum });
       }
     }
   }
-  return days;
+
+  const last = bars.length - 1;
+  if (closeDay && last >= 0) {
+    // 3. Sell whatever is still armed at the close.
+    if (wholeTrail != null && waiting.length + armed.length > 0) sellEverything(bars[last].close, last, 'close');
+    else if (armed.length > 0) {
+      for (const open of armed) sell(open, bars[last].close, last, 'close');
+      armed = [];
+    }
+  }
+  const held = waiting.map((open) => open.lot);
+  for (const open of armed) insertLot(held, open.lot);
+  return {
+    sells,
+    held,
+    costSum,
+    armed: armed.map((open) => ({ lot: open.lot, trail: open.trail! })),
+    wholeTrail: waiting.length + armed.length > 0 ? wholeTrail : null,
+  };
 }
 
 /** What the account did, in rupees, for one share count and charges setting. */

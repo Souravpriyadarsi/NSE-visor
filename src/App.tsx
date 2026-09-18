@@ -10,6 +10,7 @@ import { loadManifest, loadResearchScores, loadStockList } from './lib/data/load
 import { toListedStocks } from './lib/data/stockList.ts';
 import { NSE_INDICES } from './lib/data/symbols.ts';
 import type { Tab } from './lib/urlState.ts';
+import { AlgoTradingTab } from './tabs/AlgoTradingTab.tsx';
 import { AnalyzeTab } from './tabs/AnalyzeTab.tsx';
 import { DashboardTab } from './tabs/DashboardTab.tsx';
 import { DayTradingTab } from './tabs/DayTradingTab.tsx';
@@ -31,6 +32,10 @@ const PAGES: Record<Tab, { title: string; subtitle: string }> = {
   daytrading: {
     title: 'Day trading',
     subtitle: 'Backtest intraday strategies on 5-minute prices, then let one paper-trade live prices under your risk limits.',
+  },
+  algo: {
+    title: 'Algo trading',
+    subtitle: 'A paper-trading bot that runs the Minimal Margin Maximus rules on live prices with pretend money.',
   },
   fetch: { title: 'Fetch any stock', subtitle: 'Add NSE stocks to your Dashboard, and choose which ones to track daily.' },
 };
@@ -94,6 +99,7 @@ export default function App() {
           <TestsTab symbol={symbol} options={options} fetched={saved.stocks} onSelectSymbol={(next) => navigate({ symbol: next })} />
         )}
         {tab === 'daytrading' && <DayTradingTab symbol={symbol} options={options} onSelectSymbol={(next) => navigate({ symbol: next })} />}
+        {tab === 'algo' && <AlgoTradingTab options={options} />}
         {tab === 'fetch' &&<FetchTab options={options} saved={saved} watchlist={watchlist} onAnalyze={analyzeStock} />}
       </main>
     </div>

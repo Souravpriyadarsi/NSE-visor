@@ -6,7 +6,7 @@ export function Toggle<T extends string | number>(props: {
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="flex rounded-lg border border-ink-700 p-0.5" role="group" aria-label={props.label}>
+    <div className="flex max-w-full flex-wrap rounded-lg border border-ink-700 p-0.5" role="group" aria-label={props.label}>
       {props.choices.map((choice) => (
         <button
           key={String(choice.value)}
