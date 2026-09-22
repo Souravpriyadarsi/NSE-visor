@@ -22,7 +22,7 @@ import {
 } from '../tests/marginMaximus.ts';
 
 export const MAX_BOT_STOCKS = 5;
-export const BOT_SHARE_CHOICES = [1, 10, 50, 100] as const;
+export const BOT_SHARE_CHOICES = [10, 50, 100, 200] as const;
 export const DEFAULT_BOT_CASH = 1_000_000;
 /** Live prices only say how high and low each 5-minute bar went, so the bot always assumes the less favourable order. */
 const WORST_CASE = true;

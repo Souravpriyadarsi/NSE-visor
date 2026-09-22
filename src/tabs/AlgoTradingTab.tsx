@@ -155,7 +155,7 @@ function AlgoBot({ options, state, setState }: BotProps) {
             <Toggle
               label="Shares per day"
               value={settings.shares}
-              choices={BOT_SHARE_CHOICES.map((n) => ({ value: n, label: `${n} ${n === 1 ? 'share' : 'shares'}` }))}
+              choices={BOT_SHARE_CHOICES.map((n) => ({ value: n, label: `${n} shares` }))}
               onChange={(shares) => changeSettings({ shares })}
             />
             <Toggle
